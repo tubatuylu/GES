@@ -121,6 +121,68 @@ function hillshade(slopeDeg, aspectDeg, sunElevDeg, sunAzimDeg) {
   return 255 * Math.max(0, Math.cos(zr) * Math.cos(sr) + Math.sin(zr) * Math.sin(sr) * Math.cos(azr - ar));
 }
 
+// ── Haversine distance ────────────────────────────────────────────────────────
+
+/**
+ * Returns the great-circle distance in kilometres between two lat/lng points.
+ */
+export function haversineKm(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * DEG;
+  const dLng = (lng2 - lng1) * DEG;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * DEG) * Math.cos(lat2 * DEG) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.asin(Math.sqrt(a));
+}
+
+// ── Overpass API (OSM substations) ────────────────────────────────────────────
+
+/**
+ * Queries the Overpass API for power=substation nodes within `radiusM` metres
+ * of the given centroid. Returns the nearest substation distance in km, or null
+ * when none are found.
+ *
+ * @param {number} centerLat
+ * @param {number} centerLng
+ * @param {number} radiusM  – search radius in metres (default 10 000 = 10 km)
+ */
+export async function fetchNearestSubstationKm(centerLat, centerLng, radiusM = 10000) {
+  const query = `
+    [out:json][timeout:25];
+    (
+      node["power"="substation"](around:${radiusM},${centerLat},${centerLng});
+      way["power"="substation"](around:${radiusM},${centerLat},${centerLng});
+      relation["power"="substation"](around:${radiusM},${centerLat},${centerLng});
+    );
+    out center;
+  `.trim();
+
+  const url =
+    'https://overpass-api.de/api/interpreter?data=' +
+    encodeURIComponent(query);
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Overpass API error: ' + res.status);
+
+  const data = await res.json();
+  const elements = data.elements ?? [];
+
+  if (elements.length === 0) return null;
+
+  // Normalise lat/lng: nodes have them directly, ways/relations expose `.center`
+  let minKm = Infinity;
+  for (const el of elements) {
+    const lat = el.lat ?? el.center?.lat;
+    const lng = el.lon ?? el.center?.lon;
+    if (lat == null || lng == null) continue;
+    const d = haversineKm(centerLat, centerLng, lat, lng);
+    if (d < minKm) minKm = d;
+  }
+
+  return minKm === Infinity ? null : +minKm.toFixed(2);
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 export async function runGESAnalysis(latlngs) {

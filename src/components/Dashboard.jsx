@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, MapPin, TrendingUp, Sun, Zap, ShieldAlert, Eye } from 'lucide-react';
+import { Activity, MapPin, TrendingUp, Sun, Zap, ShieldAlert, Eye, Cable } from 'lucide-react';
 
 const ASPECT_LABELS = [
   [0,   45,  '↑ Kuzey — Uygun Değil 🔴'],
@@ -51,7 +51,7 @@ const MaskBar = ({ label, pct, color }) => (
   </div>
 );
 
-export default function Dashboard({ analysisResult: r, isAnalyzing, analysisError }) {
+export default function Dashboard({ analysisResult: r, isAnalyzing, analysisError, nearestSubstationKm, isFetchingSubstation }) {
   return (
     <div className="w-full md:w-96 bg-slate-900/95 backdrop-blur-md text-white h-auto md:h-full max-h-[45vh] md:max-h-none flex flex-col border-t md:border-t-0 md:border-l border-slate-700 overflow-y-auto shadow-2xl shrink-0">
       {/* Header */}
@@ -60,7 +60,7 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
           <Activity size={16} className="text-blue-400" /> Analiz Sonuçları
         </h2>
         <p className="text-slate-500 text-xs mt-0.5">
-          Gerçek SRTM verisi • Horn algoritması
+          Gerçek SRTM verisi • Horn algoritması • OSM Overpass
         </p>
       </div>
 
@@ -142,6 +142,55 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
               <Card label="Düzeltilmiş Güneş Radyasyonu" value={`${r.avgSolarKWhM2} kWh/m²`} sub="Tilt & gölge düzeltmeli" icon={<Sun size={14}/>} accent="yellow" />
             )}
             <Card label="Tahmini Kapasite" value={`${r.capacityMW} MW`} sub="~1 MW/ha varsayımı" icon={<Zap size={14}/>} accent="purple" />
+
+            {/* Nearest Substation */}
+            {(isFetchingSubstation || nearestSubstationKm !== undefined) && (
+              <div className={`border rounded-xl p-3 bg-slate-800/40 ${
+                isFetchingSubstation
+                  ? 'border-slate-600/40'
+                  : nearestSubstationKm === null
+                    ? 'border-slate-600/40'
+                    : nearestSubstationKm <= 5
+                      ? 'border-emerald-500/30'
+                      : nearestSubstationKm <= 10
+                        ? 'border-yellow-500/30'
+                        : 'border-red-500/30'
+              }`}>
+                <div className="flex justify-between items-start mb-1">
+                  <span className="text-slate-400 text-xs font-medium">En Yakın Trafo</span>
+                  <Cable size={14} className={`${
+                    isFetchingSubstation ? 'text-slate-500 animate-pulse'
+                    : nearestSubstationKm === null ? 'text-slate-500'
+                    : nearestSubstationKm <= 5 ? 'text-emerald-400'
+                    : nearestSubstationKm <= 10 ? 'text-yellow-400'
+                    : 'text-red-400'
+                  }`} />
+                </div>
+                {isFetchingSubstation ? (
+                  <div className="text-sm font-mono text-slate-500 animate-pulse">Sorgulanıyor…</div>
+                ) : nearestSubstationKm === null ? (
+                  <>
+                    <div className="text-xl font-bold font-mono text-slate-400">—</div>
+                    <div className="text-xs text-slate-500 mt-0.5">10 km içinde trafo bulunamadı</div>
+                  </>
+                ) : (
+                  <>
+                    <div className={`text-xl font-bold font-mono ${
+                      nearestSubstationKm <= 5 ? 'text-emerald-400'
+                      : nearestSubstationKm <= 10 ? 'text-yellow-400'
+                      : 'text-red-400'
+                    }`}>{nearestSubstationKm} km</div>
+                    <div className="text-xs text-slate-500 mt-0.5">
+                      {nearestSubstationKm <= 5
+                        ? '✅ Çok yakın — bağlantı avantajlı'
+                        : nearestSubstationKm <= 10
+                          ? '⚠️ Orta mesafe'
+                          : '❌ Uzak — yüksek bağlantı maliyeti'}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Verdict */}
             <div className={`p-3 rounded-xl border text-xs leading-relaxed ${

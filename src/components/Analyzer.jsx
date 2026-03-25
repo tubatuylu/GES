@@ -6,7 +6,7 @@ import 'leaflet-draw/dist/leaflet.draw.css';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import Sidebar from './Sidebar';
 import Dashboard from './Dashboard';
-import { runGESAnalysis, geodesicAreaM2, perimeterM } from '../services/analysisEngine';
+import { runGESAnalysis, geodesicAreaM2, perimeterM, fetchNearestSubstationKm } from '../services/analysisEngine';
 
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
@@ -132,6 +132,8 @@ export default function Analyzer({ onBack }) {
   const [analysisResult, setAnalysisResult] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState(null);
+  const [nearestSubstationKm, setNearestSubstationKm] = useState(null);
+  const [isFetchingSubstation, setIsFetchingSubstation] = useState(false);
 
   const layers = { dem: activeLayer === 'dem', slope: activeLayer === 'slope', aspect: activeLayer === 'aspect' };
 
@@ -139,21 +141,44 @@ export default function Analyzer({ onBack }) {
     setActiveLayer(prev => (prev === id ? 'standard' : id));
 
   const handlePolygonDrawn = useCallback(async (latlngs) => {
-    if (!latlngs) { setAnalysisResult(null); return; }
+    if (!latlngs) {
+      setAnalysisResult(null);
+      setNearestSubstationKm(null);
+      return;
+    }
 
     setIsAnalyzing(true);
     setAnalysisError(null);
     setAnalysisResult(null);
+    setNearestSubstationKm(null);
+    setIsFetchingSubstation(true);
 
-    try {
-      const result = await runGESAnalysis(latlngs);
-      setAnalysisResult(result);
-    } catch (err) {
-      console.error(err);
-      setAnalysisError(err.message || 'Analiz hatası oluştu.');
-    } finally {
-      setIsAnalyzing(false);
+    // Centroid for Overpass query
+    const centerLat = latlngs.reduce((s, p) => s + p.lat, 0) / latlngs.length;
+    const centerLng = latlngs.reduce((s, p) => s + p.lng, 0) / latlngs.length;
+
+    // Run GES analysis and Overpass query in parallel
+    const [gesResult, substationResult] = await Promise.allSettled([
+      runGESAnalysis(latlngs),
+      fetchNearestSubstationKm(centerLat, centerLng, 10000),
+    ]);
+
+    if (gesResult.status === 'fulfilled') {
+      setAnalysisResult(gesResult.value);
+    } else {
+      console.error(gesResult.reason);
+      setAnalysisError(gesResult.reason?.message || 'Analiz hatası oluştu.');
     }
+
+    if (substationResult.status === 'fulfilled') {
+      setNearestSubstationKm(substationResult.value);
+    } else {
+      console.warn('Overpass sorgusu başarısız:', substationResult.reason);
+      setNearestSubstationKm(null);
+    }
+
+    setIsAnalyzing(false);
+    setIsFetchingSubstation(false);
   }, []);
 
   return (
@@ -181,6 +206,8 @@ export default function Analyzer({ onBack }) {
           analysisResult={analysisResult}
           isAnalyzing={isAnalyzing}
           analysisError={analysisError}
+          nearestSubstationKm={nearestSubstationKm}
+          isFetchingSubstation={isFetchingSubstation}
         />
       </main>
     </div>
