@@ -157,13 +157,13 @@ export default function Analyzer({ onBack }) {
   }, []);
 
   return (
-    <div className="flex w-full h-screen overflow-hidden bg-slate-950 text-slate-200 antialiased">
+    <div className="flex flex-col md:flex-row w-full h-[100dvh] overflow-hidden bg-slate-950 text-slate-200 antialiased">
       <Sidebar layers={layers} toggleLayer={handleLayerToggle} />
 
-      <main className="flex-1 flex overflow-hidden relative">
+      <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
         <button 
           onClick={onBack}
-          className="absolute top-4 left-4 z-[1000] flex items-center gap-2 px-4 py-2 bg-slate-900/80 backdrop-blur-md text-white border border-slate-700/50 rounded-lg shadow-lg hover:bg-slate-800 transition-all font-medium"
+          className="absolute top-4 right-4 md:right-auto md:left-4 z-[1000] flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-slate-900/80 backdrop-blur-md text-white border border-slate-700/50 rounded-lg shadow-lg hover:bg-slate-800 transition-all font-medium text-sm md:text-base opacity-90 hover:opacity-100"
         >
           <ArrowLeft size={18} />
           <span>Geri Dön</span>

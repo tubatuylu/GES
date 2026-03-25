@@ -28,7 +28,7 @@ export default function App() {
         </nav>
         <button 
           onClick={() => setIsAnalyzing(true)}
-          className="hidden md:flex items-center gap-2 px-5 py-2.5 rounded-full bg-slate-800 border border-slate-700 hover:border-amber-500/50 hover:bg-slate-800 text-sm font-semibold transition-all shadow-[0_0_15px_rgba(245,158,11,0.1)] hover:shadow-[0_0_20px_rgba(245,158,11,0.2)]"
+          className="flex items-center gap-2 px-4 py-2 md:px-5 md:py-2.5 rounded-full bg-slate-800 border border-slate-700 hover:border-amber-500/50 hover:bg-slate-800 text-xs md:text-sm font-semibold transition-all shadow-[0_0_15px_rgba(245,158,11,0.1)] hover:shadow-[0_0_20px_rgba(245,158,11,0.2)]"
         >
           Panele Git
         </button>
@@ -42,8 +42,8 @@ export default function App() {
             <span>Yeni Nesil GES Fizibilite Motoru Yayında</span>
           </div>
           
-          <h1 className="text-5xl md:text-7xl font-bold tracking-tight text-white leading-[1.1]">
-            Aura<span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-amber-600">Sol</span>: Güneşin Gücünü <br className="hidden md:block"/> Veriye Dönüştürün.
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight text-white leading-[1.1]">
+            Aura<span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 to-amber-600">Sol</span>: Güneşin Gücünü <br className="hidden xl:block"/> Veriye Dönüştürün.
           </h1>
           
           <p className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">

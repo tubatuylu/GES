@@ -3,8 +3,8 @@ import { Layers, Thermometer, Sun, Wind } from 'lucide-react';
 
 const Sidebar = ({ layers, toggleLayer }) => {
   return (
-    <div className="w-80 bg-slate-900 text-white h-full flex flex-col border-r border-slate-700 shadow-xl overflow-hidden">
-      <div className="p-6 border-b border-slate-700">
+    <div className="w-full md:w-80 bg-slate-900 text-white h-auto md:h-full max-h-[30vh] md:max-h-none flex flex-col border-b md:border-b-0 md:border-r border-slate-700 shadow-xl overflow-y-auto shrink-0">
+      <div className="p-4 md:p-6 border-b border-slate-700 shrink-0">
         <h1 className="text-2xl font-bold bg-gradient-to-r from-yellow-400 to-orange-500 bg-clip-text text-transparent">
           GES Analiz
         </h1>

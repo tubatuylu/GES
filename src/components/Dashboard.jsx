@@ -53,7 +53,7 @@ const MaskBar = ({ label, pct, color }) => (
 
 export default function Dashboard({ analysisResult: r, isAnalyzing, analysisError }) {
   return (
-    <div className="w-96 bg-slate-900/95 backdrop-blur-md text-white h-full flex flex-col border-l border-slate-700 overflow-y-auto shadow-2xl">
+    <div className="w-full md:w-96 bg-slate-900/95 backdrop-blur-md text-white h-auto md:h-full max-h-[45vh] md:max-h-none flex flex-col border-t md:border-t-0 md:border-l border-slate-700 overflow-y-auto shadow-2xl shrink-0">
       {/* Header */}
       <div className="p-5 border-b border-slate-700/60 flex-shrink-0">
         <h2 className="text-base font-bold flex items-center gap-2">
