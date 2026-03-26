@@ -160,7 +160,11 @@ export default function Analyzer({ onBack }) {
     // Run GES analysis and Overpass query in parallel
     const [gesResult, substationResult] = await Promise.allSettled([
       runGESAnalysis(latlngs),
+<<<<<<< HEAD
       fetchNearestSubstationKm(centerLat, centerLng, 10000),
+=======
+      fetchNearestSubstationKm(centerLat, centerLng, 15000),
+>>>>>>> c674b8d (Professional GIS Analysis Engine Integration)
     ]);
 
     if (gesResult.status === 'fulfilled') {

@@ -60,7 +60,11 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
           <Activity size={16} className="text-blue-400" /> Analiz Sonuçları
         </h2>
         <p className="text-slate-500 text-xs mt-0.5">
+<<<<<<< HEAD
           Gerçek SRTM verisi • Horn algoritması • OSM Overpass
+=======
+          NASA POWER SATELLITE • MAPBOX TERRAIN • OSM NETWORK
+>>>>>>> c674b8d (Professional GIS Analysis Engine Integration)
         </p>
       </div>
 
@@ -70,8 +74,13 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
         {isAnalyzing && (
           <div className="flex flex-col items-center justify-center py-16 gap-4">
             <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+<<<<<<< HEAD
             <p className="text-slate-400 text-sm">Yükseklik verileri alınıyor…</p>
             <p className="text-slate-600 text-xs">Eğim ve bakı hesaplanıyor</p>
+=======
+            <p className="text-blue-400 text-sm font-bold animate-pulse">Analyzing Satellite Data...</p>
+            <p className="text-slate-600 text-xs">NASA POWER & Mapbox Terrain-RGB</p>
+>>>>>>> c674b8d (Professional GIS Analysis Engine Integration)
           </div>
         )}
 
@@ -171,7 +180,11 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
                 ) : nearestSubstationKm === null ? (
                   <>
                     <div className="text-xl font-bold font-mono text-slate-400">—</div>
+<<<<<<< HEAD
                     <div className="text-xs text-slate-500 mt-0.5">10 km içinde trafo bulunamadı</div>
+=======
+                    <div className="text-xs text-slate-500 mt-0.5">15 km dahilinde trafo bulunamadı</div>
+>>>>>>> c674b8d (Professional GIS Analysis Engine Integration)
                   </>
                 ) : (
                   <>
