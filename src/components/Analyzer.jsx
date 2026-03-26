@@ -1,13 +1,19 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import '../index.css';
+import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { ArrowLeft } from 'lucide-react';
 import L from 'leaflet';
+
+// CSS Imports
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-draw/dist/leaflet.draw.css';
-import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+import '../index.css';
+
+// Project Components & Services
 import Sidebar from './Sidebar';
 import Dashboard from './Dashboard';
-import { runGESAnalysis, geodesicAreaM2, perimeterM, fetchNearestSubstationKm } from '../services/analysisEngine';
+import { runGESAnalysis, fetchNearestSubstationKm } from '../services/analysisEngine';
 
+// Leaflet Icon Fix
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
@@ -26,8 +32,8 @@ const TILES = {
 const MASK_COLOR = {
   north: '#ef4444',   // red
   steep: '#f97316',   // orange
-  shadow: '#6b7280',   // grey
-  null: '#22c55e',   // green = suitable
+  shadow: '#6b7280',  // grey
+  null: '#22c55e',    // green = suitable
 };
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -48,7 +54,7 @@ const DrawControl = ({ onPolygonDrawn }) => {
     const init = async () => {
       window.L = L;
       await import('leaflet-draw');
-      if (isCancelled) return;          // bail if effect was cleaned up
+      if (isCancelled) return;
 
       const drawnItems = new L.FeatureGroup();
       drawnRef.current = drawnItems;
@@ -60,7 +66,7 @@ const DrawControl = ({ onPolygonDrawn }) => {
           polyline: false, rectangle: false, circle: false,
           circlemarker: false, marker: false,
           polygon: {
-            showArea: true, showLength: true, metric: true, feet: false,
+            showArea: true, showLength: true, metric: true,
             shapeOptions: { color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.15, weight: 2 },
           },
         },
@@ -88,7 +94,7 @@ const DrawControl = ({ onPolygonDrawn }) => {
       map.off(L.Draw.Event.CREATED);
       map.off(L.Draw.Event.DELETED);
     };
-  }, [map]);
+  }, [map, onPolygonDrawn]);
 
   return null;
 };
@@ -125,8 +131,6 @@ const AnalysisOverlay = ({ points }) => {
   return null;
 };
 
-import { ArrowLeft } from 'lucide-react';
-
 export default function Analyzer({ onBack }) {
   const [activeLayer, setActiveLayer] = useState('standard');
   const [analysisResult, setAnalysisResult] = useState(null);
@@ -153,36 +157,33 @@ export default function Analyzer({ onBack }) {
     setNearestSubstationKm(null);
     setIsFetchingSubstation(true);
 
-    // Centroid for Overpass query
     const centerLat = latlngs.reduce((s, p) => s + p.lat, 0) / latlngs.length;
     const centerLng = latlngs.reduce((s, p) => s + p.lng, 0) / latlngs.length;
 
-    // Run GES analysis and Overpass query in parallel
-    const [gesResult, substationResult] = await Promise.allSettled([
-      runGESAnalysis(latlngs),
-<<<<<<< HEAD
-      fetchNearestSubstationKm(centerLat, centerLng, 10000),
-=======
-      fetchNearestSubstationKm(centerLat, centerLng, 15000),
->>>>>>> c674b8d (Professional GIS Analysis Engine Integration)
-    ]);
+    try {
+      // Run GES analysis and Overpass query in parallel
+      const [gesResult, substationResult] = await Promise.allSettled([
+        runGESAnalysis(latlngs),
+        fetchNearestSubstationKm(centerLat, centerLng, 15000),
+      ]);
 
-    if (gesResult.status === 'fulfilled') {
-      setAnalysisResult(gesResult.value);
-    } else {
-      console.error(gesResult.reason);
-      setAnalysisError(gesResult.reason?.message || 'Analiz hatası oluştu.');
+      if (gesResult.status === 'fulfilled') {
+        setAnalysisResult(gesResult.value);
+      } else {
+        setAnalysisError(gesResult.reason?.message || 'Analiz hatası oluştu.');
+      }
+
+      if (substationResult.status === 'fulfilled') {
+        setNearestSubstationKm(substationResult.value);
+      } else {
+        setNearestSubstationKm(null);
+      }
+    } catch (err) {
+      setAnalysisError("Sistemde beklenmedik bir hata oluştu.");
+    } finally {
+      setIsAnalyzing(false);
+      setIsFetchingSubstation(false);
     }
-
-    if (substationResult.status === 'fulfilled') {
-      setNearestSubstationKm(substationResult.value);
-    } else {
-      console.warn('Overpass sorgusu başarısız:', substationResult.reason);
-      setNearestSubstationKm(null);
-    }
-
-    setIsAnalyzing(false);
-    setIsFetchingSubstation(false);
   }, []);
 
   return (
@@ -190,7 +191,7 @@ export default function Analyzer({ onBack }) {
       <Sidebar layers={layers} toggleLayer={handleLayerToggle} />
 
       <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
-        <button 
+        <button
           onClick={onBack}
           className="absolute top-4 right-4 md:right-auto md:left-4 z-[1000] flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-slate-900/80 backdrop-blur-md text-white border border-slate-700/50 rounded-lg shadow-lg hover:bg-slate-800 transition-all font-medium text-sm md:text-base opacity-90 hover:opacity-100"
         >
