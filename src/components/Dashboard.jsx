@@ -60,11 +60,7 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
           <Activity size={16} className="text-blue-400" /> Analiz Sonuçları
         </h2>
         <p className="text-slate-500 text-xs mt-0.5">
-<<<<<<< HEAD
-          Gerçek SRTM verisi • Horn algoritması • OSM Overpass
-=======
           NASA POWER SATELLITE • MAPBOX TERRAIN • OSM NETWORK
->>>>>>> c674b8d (Professional GIS Analysis Engine Integration)
         </p>
       </div>
 
@@ -74,13 +70,8 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
         {isAnalyzing && (
           <div className="flex flex-col items-center justify-center py-16 gap-4">
             <div className="w-10 h-10 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
-<<<<<<< HEAD
-            <p className="text-slate-400 text-sm">Yükseklik verileri alınıyor…</p>
-            <p className="text-slate-600 text-xs">Eğim ve bakı hesaplanıyor</p>
-=======
             <p className="text-blue-400 text-sm font-bold animate-pulse">Analyzing Satellite Data...</p>
             <p className="text-slate-600 text-xs">NASA POWER & Mapbox Terrain-RGB</p>
->>>>>>> c674b8d (Professional GIS Analysis Engine Integration)
           </div>
         )}
 
@@ -114,18 +105,47 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
         )}
 
         {/* Results */}
-        {!isAnalyzing && r && (
+        {!isAnalyzing && r && (() => {
+          const getSubstationPenalty = () => {
+            if (isFetchingSubstation || nearestSubstationKm === undefined) return 1;
+            if (nearestSubstationKm === null) return 0.4;
+            if (nearestSubstationKm <= 5) return 1;
+            if (nearestSubstationKm <= 10) return 0.8;
+            return 0.5; // > 10km
+          };
+
+          const substationPenalty = getSubstationPenalty();
+          const penaltyMultiplier = substationPenalty * (r.landCover?.penalty ?? 1);
+          const finalScore = Math.round(r.suitableRatioPct * penaltyMultiplier);
+          const hasSubstationWarning = !isFetchingSubstation && nearestSubstationKm !== undefined && (nearestSubstationKm === null || nearestSubstationKm > 10);
+          const isProtectedArea = r.landCover?.penalty === 0;
+
+          return (
           <>
             {/* Suitable area hero */}
             <div className={`p-4 rounded-2xl border-2 text-center ${
-              r.suitableRatioPct > 50 ? 'bg-emerald-500/10 border-emerald-500/40'
-              : r.suitableRatioPct > 20 ? 'bg-yellow-500/10 border-yellow-500/40'
+              finalScore > 50 ? 'bg-emerald-500/10 border-emerald-500/40'
+              : finalScore > 20 ? 'bg-yellow-500/10 border-yellow-500/40'
               : 'bg-red-500/10 border-red-500/40'
             }`}>
-              <div className="text-3xl font-black font-mono">{r.suitableRatioPct}%</div>
-              <div className="text-sm font-semibold mt-0.5">Uygun Alan</div>
+              <div className="flex justify-center items-center gap-2">
+                <div className="text-3xl font-black font-mono">{finalScore}%</div>
+                {substationPenalty < 1 && !isProtectedArea && (
+                  <div className="flex items-center gap-1 text-xs text-red-400 border border-red-500/30 bg-red-500/10 px-2 py-0.5 rounded-full">
+                    <span className="font-bold">-{Math.round((1 - substationPenalty) * 100)}%</span>
+                    <span>Şebeke Uzaklığı</span>
+                  </div>
+                )}
+                {isProtectedArea && (
+                  <div className="flex items-center gap-1 text-xs text-red-400 border border-red-500/30 bg-red-500/10 px-2 py-0.5 rounded-full">
+                    <span className="font-bold">İPTAL</span>
+                    <span>Koruma Alanı</span>
+                  </div>
+                )}
+              </div>
+              <div className="text-sm font-semibold mt-0.5">Yatırım Uygunluk Skoru</div>
               <div className="text-xs text-slate-400 mt-1">
-                {Number(r.suitableAreaM2).toLocaleString('tr-TR')} m²  ({r.suitableAreaHa} ha)
+                Fiziksel Alan: {Number(r.suitableAreaM2).toLocaleString('tr-TR')} m²  ({r.suitableAreaHa} ha)
               </div>
             </div>
 
@@ -151,6 +171,7 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
               <Card label="Düzeltilmiş Güneş Radyasyonu" value={`${r.avgSolarKWhM2} kWh/m²`} sub="Tilt & gölge düzeltmeli" icon={<Sun size={14}/>} accent="yellow" />
             )}
             <Card label="Tahmini Kapasite" value={`${r.capacityMW} MW`} sub="~1 MW/ha varsayımı" icon={<Zap size={14}/>} accent="purple" />
+            <Card label="Arazi & Zemin Türü" value={r.landCover?.type || 'Bilinmiyor'} sub={r.soilConsistency || 'Veri Yok'} icon={<MapPin size={14}/>} accent={isProtectedArea ? 'red' : r.landCover?.warning ? 'yellow' : 'green'} />
 
             {/* Nearest Substation */}
             {(isFetchingSubstation || nearestSubstationKm !== undefined) && (
@@ -180,11 +201,7 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
                 ) : nearestSubstationKm === null ? (
                   <>
                     <div className="text-xl font-bold font-mono text-slate-400">—</div>
-<<<<<<< HEAD
-                    <div className="text-xs text-slate-500 mt-0.5">10 km içinde trafo bulunamadı</div>
-=======
                     <div className="text-xs text-slate-500 mt-0.5">15 km dahilinde trafo bulunamadı</div>
->>>>>>> c674b8d (Professional GIS Analysis Engine Integration)
                   </>
                 ) : (
                   <>
@@ -207,18 +224,29 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
 
             {/* Verdict */}
             <div className={`p-3 rounded-xl border text-xs leading-relaxed ${
-              r.suitableRatioPct > 40 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-              : r.suitableRatioPct > 15 ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300'
+              isProtectedArea ? 'bg-red-500/10 border-red-500/30 text-red-300'
+              : hasSubstationWarning ? 'bg-red-500/10 border-red-500/30 text-red-300'
+              : finalScore > 40 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+              : finalScore > 15 ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300'
               : 'bg-red-500/10 border-red-500/30 text-red-300'
             }`}>
-              {r.suitableRatioPct > 40
-                ? '✅ Bu alan GES kurulumu için yüksek potansiyel taşımaktadır. Uygun alanlar haritalandırıldı.'
-                : r.suitableRatioPct > 15
-                ? '⚠️ Alan kısmen uygun. Kuzey yamaçlar ve dik bölgeler filtrelendi.'
-                : '❌ Alanın büyük bölümü kuzey bakı, dik eğim veya gölge nedeniyle uygun değil.'}
+              {isProtectedArea
+                ? `Kritik Uyarı: ${r.landCover?.type || 'Korunacak Alan'} tespit edildi. (${r.landCover?.warning}) GES kurulumu mevzuat gereği yapılamaz.`
+                : hasSubstationWarning
+                ? 'Dikkat: Yakınlarda trafo merkezi bulunamadı veya mesafe >10km. Şebeke bağlantı maliyeti yatırımın fizibilitesini imkansız kılabilir.'
+                : finalScore > 40
+                ? '✅ Bu alan GES kurulumu için yüksek potansiyel taşımaktadır. Topoğrafya ve şebeke durumu uygun.'
+                : finalScore > 15
+                ? '⚠️ Alan kısmen uygun. Kuzey yamaçlar, dik bölgeler veya şebeke uzaklığı fizibiliteyi zorluyor.'
+                : '❌ Alanın büyük bölümü topoğrafik engeller veya şebeke bağlantı yetersizliği nedeniyle uygun değil.'}
+              {r.landCover?.warning && !isProtectedArea && (
+                <div className="mt-2 text-yellow-400 font-semibold border-t border-yellow-500/20 pt-2">
+                  ⚠️ Ek Not: {r.landCover.warning}
+                </div>
+              )}
             </div>
           </>
-        )}
+        )})()}
       </div>
 
       <div className="p-3 border-t border-slate-800 flex-shrink-0 text-center">

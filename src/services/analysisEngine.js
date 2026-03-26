@@ -4,9 +4,9 @@
 
 const DEG = Math.PI / 180;
 
-// API Keys from .env
-const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_TOKEN;
-const NASA_KEY = process.env.REACT_APP_NASA_API_KEY;
+// API Keys from .env (Vite requires VITE_ prefix and import.meta.env)
+const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN;
+const NASA_KEY = import.meta.env.VITE_NASA_API_KEY;
 
 // ── Geometry Helpers ──────────────────────────────────────────────────────────
 
@@ -141,6 +141,37 @@ export async function fetchNearestSubstationKm(centerLat, centerLng, radiusM = 1
   return minKm === Infinity ? null : +minKm.toFixed(2);
 }
 
+export async function fetchEsriLandCover(lat, lng) {
+  try {
+    const geom = JSON.stringify({ x: lng, y: lat, spatialReference: { wkid: 4326 } });
+    const url = `https://ic.imagery1.arcgis.com/arcgis/rest/services/Sentinel2_10m_LandCover/ImageServer/identify?geometryType=esriGeometryPoint&geometry=${encodeURIComponent(geom)}&f=json`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.value ? parseInt(data.value, 10) : null;
+  } catch (e) {
+    console.error("Land Cover API Hatası:", e);
+    return null;
+  }
+}
+
+function getLandCoverStatus(val) {
+  if (!val) return { type: 'Bilinmiyor', penalty: 1, warning: null };
+  const v = Number(val);
+  if (v === 1 || v === 2 || v === 4) return { type: v === 1 ? 'Su Alanı' : v === 2 ? 'Orman' : 'Sulak Alan', penalty: 0, warning: 'YEDİNCİ SINIF ARAZİ / KORUMA ALANI' };
+  if (v === 5) return { type: 'Tarım Alanı (Cropland)', penalty: 1, warning: 'Tarım Dışı Kullanım İzni Gereklidir' };
+  const types = { 3: 'Çayır/Mera', 6: 'Çalılık/Maki', 7: 'Yerleşim', 8: 'Çıplak Toprak', 9: 'Kar/Buz', 10: 'Bulut' };
+  return { type: types[v] || `Tip ${v}`, penalty: 1, warning: null };
+}
+
+function inferSoilConsistency(slope, lcVal) {
+  if (!lcVal) return 'Bilinmiyor';
+  const v = Number(lcVal);
+  if (slope > 10 && (v === 6 || v === 7 || v === 8)) return 'Kayalık/Sert Zemin';
+  if (slope < 10 && (v === 3 || v === 5)) return 'Gevşek/Yumuşak Toprak';
+  return 'Orta Derece/Karma Zemin';
+}
+
 // ── Ana Analiz Motoru ─────────────────────────────────────────────────────────
 
 export async function runGESAnalysis(latlngs) {
@@ -154,7 +185,12 @@ export async function runGESAnalysis(latlngs) {
   const N = area < 50000 ? 7 : area < 200000 ? 8 : area < 1000000 ? 9 : 10;
   const { grid, allCoords, latStep, lngStep } = buildGrid(latlngs, N);
 
-  const elevations = await fetchElevations(allCoords);
+  const [elevations, NASA_SOLAR, landCoverVal] = await Promise.all([
+    fetchElevations(allCoords),
+    fetchNASAData(avgLat, avgLng),
+    fetchEsriLandCover(avgLat, avgLng)
+  ]);
+
   const E = Array.from({ length: N }, (_, i) =>
     Array.from({ length: N }, (_, j) => elevations[i * N + j] ?? 0)
   );
@@ -164,7 +200,6 @@ export async function runGESAnalysis(latlngs) {
   const dy = latStep * mPerLat;
   const dx = lngStep * mPerLng;
 
-  const NASA_SOLAR = await fetchNASAData(avgLat, avgLng);
   const points = [];
 
   for (let i = 1; i < N - 1; i++) {
@@ -207,6 +242,10 @@ export async function runGESAnalysis(latlngs) {
   const suitableRatio = suitable.length / points.length;
   const suitableAreaM2 = area * suitableRatio;
 
+  const avgSlope = +(points.reduce((s, p) => s + p.slopeDeg, 0) / points.length).toFixed(1);
+  const landCover = getLandCoverStatus(landCoverVal);
+  const soilConsistency = inferSoilConsistency(avgSlope, landCoverVal);
+
   return {
     totalAreaM2: Math.round(area),
     totalAreaHa: (area / 10000).toFixed(2),
@@ -215,9 +254,11 @@ export async function runGESAnalysis(latlngs) {
     suitableAreaM2: Math.round(suitableAreaM2),
     suitableAreaHa: (suitableAreaM2 / 10000).toFixed(2),
     suitableRatioPct: +(suitableRatio * 100).toFixed(1),
-    avgSlopeDeg: +(points.reduce((s, p) => s + p.slopeDeg, 0) / points.length).toFixed(1),
+    avgSlopeDeg: avgSlope,
     avgSolarKWhM2: NASA_SOLAR,
     capacityMW: +(suitableAreaM2 / 10000).toFixed(2),
+    landCover,
+    soilConsistency,
     points,
   };
 }
