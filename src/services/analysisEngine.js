@@ -155,20 +155,59 @@ export async function fetchEsriLandCover(lat, lng) {
   }
 }
 
+// Full land cover lookup covering both Esri 1-10 AND ESA/LCCS 10-100 class codes
+const LC_TYPES = {
+  // Esri Sentinel-2 10m classes (1-10)
+  1: { label: 'Su Alanı', penalty: 0, level: 'blocked' },
+  2: { label: 'Orman', penalty: 0, level: 'blocked' },
+  3: { label: 'Çayır/Mera', penalty: 1, level: 'ideal' },
+  4: { label: 'Sulak Alan', penalty: 0, level: 'blocked' },
+  5: { label: 'Tarım Alanı (Cropland)', penalty: 1, level: 'warning' },
+  6: { label: 'Çalılık/Maki', penalty: 1, level: 'ideal' },
+  7: { label: 'Yerleşim/Kentsel', penalty: 1, level: 'info' },
+  8: { label: 'Çıplak Toprak', penalty: 1, level: 'ideal' },
+  9: { label: 'Kar/Buz', penalty: 0, level: 'blocked' },
+  10: { label: 'Bulut / Veri Yok', penalty: 1, level: 'info' },
+  11: { label: 'Yağmurla Beslenen Tarım (Tarla)', penalty: 1, level: 'warning', costImpactPct: 5 },
+  // ESA WorldCover / LCCS / GlobeCover classes (10-100 range)
+  14: { label: 'Ağaçlık Tarım Alanı', penalty: 1, level: 'warning', costImpactPct: 5 },
+  20: { label: 'Sulama Tarımı / Pirinllik', penalty: 1, level: 'warning', costImpactPct: 5 },
+  30: { label: 'Mera / Otlak', penalty: 1, level: 'info' },
+  40: { label: 'Bodur Bitki / Çalılık', penalty: 1, level: 'ideal' },
+  50: { label: 'Kentsel / Yapılı Alan', penalty: 1, level: 'info' },
+  60: { label: 'Seyrek Bitki Ortası', penalty: 1, level: 'ideal' },
+  70: { label: 'Kar / Buz', penalty: 0, level: 'blocked' },
+  80: { label: 'Seyrek Bitki / Çıplak Toprak', penalty: 1, level: 'ideal' },
+  90: { label: 'Sulak Alan / Bataaklık', penalty: 0, level: 'blocked' },
+  100: { label: 'Yosun / Liken Alanı', penalty: 1, level: 'info' },
+};
+
+const MEVZUAT_NOTLARI = {
+  blocked: { banner: 'bg-red-500/10 border-red-500/30 text-red-300', icon: '❌', prefix: 'YASAK', text: 'YEDİNCİ SINIF ARAZİ / KORUMA ALANI. GES kurulumu mevzuat gereği yapılamaz.' },
+  warning: { banner: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300', icon: '⚠️', prefix: 'UYARI', text: 'Tarım arazisi tespiti. Tarım dışı kullanım izni alınması gerekmektedir.' },
+  info:    { banner: 'bg-blue-500/10 border-blue-500/30 text-blue-300', icon: 'ℹ️', prefix: 'BİLGİ', text: 'Mera / yerleşim arazisi tespiti. Vasıf değişikliği süreci gerekebilir.' },
+  ideal:   { banner: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300', icon: '✅', prefix: 'İDEAL', text: 'Düşuk verimli arazi tespiti. İzin süreçleri için avantajlı.' },
+};
+
 function getLandCoverStatus(val) {
-  if (!val) return { type: 'Bilinmiyor', penalty: 1, warning: null };
+  if (val === null || val === undefined) return { type: 'Bilinmiyor', label: 'Bilinmiyor', penalty: 1, level: 'info', costImpactPct: 0, rawVal: null };
   const v = Number(val);
-  if (v === 1 || v === 2 || v === 4) return { type: v === 1 ? 'Su Alanı' : v === 2 ? 'Orman' : 'Sulak Alan', penalty: 0, warning: 'YEDİNCİ SINIF ARAZİ / KORUMA ALANI' };
-  if (v === 5) return { type: 'Tarım Alanı (Cropland)', penalty: 1, warning: 'Tarım Dışı Kullanım İzni Gereklidir' };
-  const types = { 3: 'Çayır/Mera', 6: 'Çalılık/Maki', 7: 'Yerleşim', 8: 'Çıplak Toprak', 9: 'Kar/Buz', 10: 'Bulut' };
-  return { type: types[v] || `Tip ${v}`, penalty: 1, warning: null };
+  const entry = LC_TYPES[v];
+  if (!entry) return { type: `Sınıf ${v}`, label: `Sınıf ${v}`, penalty: 1, level: 'info', costImpactPct: 0, rawVal: v };
+  return { type: entry.label, label: entry.label, penalty: entry.penalty, level: entry.level, costImpactPct: entry.costImpactPct || 0, rawVal: v };
+}
+
+function getMevzuatNotu(level) {
+  return MEVZUAT_NOTLARI[level] || null;
 }
 
 function inferSoilConsistency(slope, lcVal) {
-  if (!lcVal) return 'Bilinmiyor';
+  if (lcVal === null || lcVal === undefined) return 'Bilinmiyor';
   const v = Number(lcVal);
-  if (slope > 10 && (v === 6 || v === 7 || v === 8)) return 'Kayalık/Sert Zemin';
-  if (slope < 10 && (v === 3 || v === 5)) return 'Gevşek/Yumuşak Toprak';
+  const hardTypes = [6, 7, 8, 40, 50, 60, 80];
+  const softTypes = [3, 5, 11, 14, 20, 30];
+  if (slope > 10 && hardTypes.includes(v)) return 'Kayalık/Sert Zemin';
+  if (slope < 10 && softTypes.includes(v)) return 'Gevşek/Yumuşak Toprak';
   return 'Orta Derece/Karma Zemin';
 }
 
@@ -245,6 +284,7 @@ export async function runGESAnalysis(latlngs) {
   const avgSlope = +(points.reduce((s, p) => s + p.slopeDeg, 0) / points.length).toFixed(1);
   const landCover = getLandCoverStatus(landCoverVal);
   const soilConsistency = inferSoilConsistency(avgSlope, landCoverVal);
+  const mevzuatNotu = getMevzuatNotu(landCover.level);
 
   return {
     totalAreaM2: Math.round(area),
@@ -259,6 +299,7 @@ export async function runGESAnalysis(latlngs) {
     capacityMW: +(suitableAreaM2 / 10000).toFixed(2),
     landCover,
     soilConsistency,
+    mevzuatNotu,
     points,
   };
 }

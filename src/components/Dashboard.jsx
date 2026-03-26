@@ -170,8 +170,29 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
             {r.avgSolarKWhM2 > 0 && (
               <Card label="Düzeltilmiş Güneş Radyasyonu" value={`${r.avgSolarKWhM2} kWh/m²`} sub="Tilt & gölge düzeltmeli" icon={<Sun size={14}/>} accent="yellow" />
             )}
-            <Card label="Tahmini Kapasite" value={`${r.capacityMW} MW`} sub="~1 MW/ha varsayımı" icon={<Zap size={14}/>} accent="purple" />
-            <Card label="Arazi & Zemin Türü" value={r.landCover?.type || 'Bilinmiyor'} sub={r.soilConsistency || 'Veri Yok'} icon={<MapPin size={14}/>} accent={isProtectedArea ? 'red' : r.landCover?.warning ? 'yellow' : 'green'} />
+            <Card label="Tahmini Kapasite" value={`${r.capacityMW} MW`}
+              sub={r.landCover?.costImpactPct > 0
+                ? `~1 MW/ha varsayımı · +%${r.landCover.costImpactPct} İzin & Bürokrasi Payı`
+                : '~1 MW/ha varsayımı'}
+              icon={<Zap size={14}/>} accent="purple" />
+            <Card
+              label="Arazi & Zemin Türü"
+              value={r.landCover?.label || 'Bilinmiyor'}
+              sub={r.soilConsistency || 'Veri Yok'}
+              icon={<MapPin size={14}/>}
+              accent={isProtectedArea ? 'red' : (r.landCover?.level === 'warning' ? 'yellow' : r.landCover?.level === 'ideal' ? 'green' : 'slate')}
+            />
+            {r.mevzuatNotu && (
+              <div className={`border rounded-xl p-3 text-xs leading-relaxed ${r.mevzuatNotu.banner}`}>
+                <div className="font-black mb-1">{r.mevzuatNotu.icon} MEVZUAT NOTU: {r.mevzuatNotu.prefix}</div>
+                <div>{r.mevzuatNotu.text}</div>
+                {r.landCover?.costImpactPct > 0 && (
+                  <div className="mt-1.5 font-semibold border-t border-current/20 pt-1.5">
+                    💰 Maliyet Etkisi: Tahmini yatırım maliyetine +%{r.landCover.costImpactPct} İzin & Bürokrasi Payı eklenmesi önerilir.
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Nearest Substation */}
             {(isFetchingSubstation || nearestSubstationKm !== undefined) && (
