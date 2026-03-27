@@ -403,9 +403,9 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
               <div className="space-y-3">
                 <button 
                   onClick={() => window.open('https://wa.me/905055621024')}
-                  className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold rounded-xl shadow-[0_0_20px_rgba(245,158,11,0.4)] transition-all flex items-center justify-center gap-2 transform active:scale-95"
+                  className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold rounded-xl shadow-[0_0_20px_rgba(245,158,11,0.4)] transition-all flex items-center justify-center gap-2 transform active:scale-95 text-sm"
                 >
-                  <zap className="fill-current" size={16} /> Ödemeye Geç
+                  <Zap className="fill-current" size={16} /> Ödemeye Geç (WhatsApp)
                 </button>
               </div>
             </div>
