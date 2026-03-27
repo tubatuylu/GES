@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Analyzer from './components/Analyzer';
 import AuraLogo from './components/AuraLogo';
-import { Sparkles, Map, Sun, FileSpreadsheet, ArrowRight } from 'lucide-react';
+import { Sparkles, Map, Sun, FileSpreadsheet, ArrowRight, Mail, MapPin } from 'lucide-react';
 
 export default function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -82,6 +82,44 @@ export default function App() {
             desc="Sadece uygun alanları ayırmakla kalmaz, tahmini MW kapasite ve kullanılabilir alan büyüklüğünü anlık olarak raporlar."
             glowColor="emerald"
           />
+        </div>
+
+        {/* Contact Section */}
+        <div className="mt-32 relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-amber-500/5 via-transparent to-blue-500/5 rounded-3xl" />
+          <div className="relative border border-slate-800 rounded-3xl p-10 md:p-16 text-center space-y-6 bg-slate-900/60 backdrop-blur-sm">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-sm font-medium">
+              <Mail size={14} /> Bize Ulaşın
+            </div>
+            <h2 className="text-3xl md:text-4xl font-bold text-white">
+              Projenizi Birlikte Değerlendirelim
+            </h2>
+            <p className="text-slate-400 max-w-xl mx-auto text-sm leading-relaxed">
+              GES yatırım süreçlerinizde profesyonel CBS ve fizibilite desteği için iletişime geçin.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+              <a
+                href="mailto:tugbakeskik@gmail.com"
+                className="flex items-center gap-3 px-6 py-3 rounded-xl bg-slate-800 border border-slate-700 hover:border-amber-500/40 hover:bg-slate-700 transition-all text-sm font-medium group"
+              >
+                <Mail size={16} className="text-amber-400 group-hover:scale-110 transition-transform" />
+                <span>tugbakeskik@gmail.com</span>
+              </a>
+              <a
+                href="https://linkedin.com/in/tugbakeskik"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 px-6 py-3 rounded-xl bg-slate-800 border border-slate-700 hover:border-blue-500/40 hover:bg-slate-700 transition-all text-sm font-medium group"
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" className="text-blue-400 group-hover:scale-110 transition-transform shrink-0"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>
+                <span>linkedin.com/in/tugbakeskik</span>
+              </a>
+              <div className="flex items-center gap-3 px-6 py-3 rounded-xl bg-slate-800 border border-slate-700 text-sm font-medium text-slate-400">
+                <MapPin size={16} className="text-emerald-400" />
+                <span>İstanbul, Türkiye</span>
+              </div>
+            </div>
+          </div>
         </div>
       </main>
     </div>

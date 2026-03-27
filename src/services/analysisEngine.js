@@ -84,19 +84,33 @@ export async function fetchElevationMapbox(lat, lng) {
 
 export async function fetchNASAData(lat, lng) {
   const today = new Date();
-  const lastYear = new Date();
-  lastYear.setFullYear(today.getFullYear() - 1);
-  const formatDate = (d) => d.toISOString().split('T')[0].replace(/-/g, '');
+  const lastYear = today.getFullYear() - 1;
 
-  const url = `https://power.larc.nasa.gov/api/temporal/daily/point?parameters=ALLSKY_SFC_SW_DWN&community=RE&longitude=${lng}&latitude=${lat}&start=${formatDate(lastYear)}&end=${formatDate(today)}&format=JSON&api_key=${NASA_KEY}`;
+  const url = `https://power.larc.nasa.gov/api/temporal/monthly/point?parameters=ALLSKY_SFC_SW_DWN&community=RE&longitude=${lng}&latitude=${lat}&format=JSON&start=${lastYear}&end=${lastYear}&api_key=${NASA_KEY}`;
 
   const res = await fetch(url);
   if (!res.ok) throw new Error('NASA API Hatası');
   const data = await res.json();
-  const values = Object.values(data.properties.parameter.ALLSKY_SFC_SW_DWN);
-  const validValues = values.filter(v => v > 0);
-  const avgDaily = validValues.length > 0 ? validValues.reduce((s, v) => s + v, 0) / validValues.length : 4.6;
-  return Math.round(avgDaily * 365);
+  
+  const rawData = data.properties.parameter.ALLSKY_SFC_SW_DWN;
+  const monthlySolar = [];
+
+  for (let i = 1; i <= 12; i++) {
+    const key = `${lastYear}${i.toString().padStart(2, '0')}`;
+    const value = rawData[key] > 0 ? rawData[key] : 4.6; // fallback if -999 representing missing data
+    monthlySolar.push({
+      month: i,
+      monthName: ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'][i-1],
+      kWhM2Day: value,
+      kWhM2Month: Math.round(value * 30.4)
+    });
+  }
+  
+  // Key "13" in NASA POWER monthly point data represents the annual average
+  const annualAvgDaily = rawData[`${lastYear}13`] > 0 ? rawData[`${lastYear}13`] : 4.6;
+  const annualTotal = Math.round(annualAvgDaily * 365);
+
+  return { annualTotal, monthlySolar };
 }
 
 async function fetchElevations(coords) {
@@ -219,16 +233,19 @@ export async function runGESAnalysis(latlngs) {
   const avgLat = latlngs.reduce((s, p) => s + p.lat, 0) / latlngs.length;
   const avgLng = latlngs.reduce((s, p) => s + p.lng, 0) / latlngs.length;
 
-  if (area > 5000000) throw new Error('Seçilen alan çok büyük (Maks 5km²).');
+  if (area > 20000000) throw new Error('Seçilen alan çok büyük (Maks 20km²).');
 
-  const N = area < 50000 ? 7 : area < 200000 ? 8 : area < 1000000 ? 9 : 10;
+  const N = area < 50000 ? 7 : area < 200000 ? 8 : area < 1000000 ? 9 : 11;
   const { grid, allCoords, latStep, lngStep } = buildGrid(latlngs, N);
 
-  const [elevations, NASA_SOLAR, landCoverVal] = await Promise.all([
+  const [elevations, nasaData, landCoverVal] = await Promise.all([
     fetchElevations(allCoords),
     fetchNASAData(avgLat, avgLng),
     fetchEsriLandCover(avgLat, avgLng)
   ]);
+  
+  const NASA_SOLAR = nasaData.annualTotal;
+  const monthlySolar = nasaData.monthlySolar;
 
   const E = Array.from({ length: N }, (_, i) =>
     Array.from({ length: N }, (_, j) => elevations[i * N + j] ?? 0)
@@ -294,8 +311,14 @@ export async function runGESAnalysis(latlngs) {
     suitableAreaM2: Math.round(suitableAreaM2),
     suitableAreaHa: (suitableAreaM2 / 10000).toFixed(2),
     suitableRatioPct: +(suitableRatio * 100).toFixed(1),
+    northPct: +(points.filter(p => p.mask === 'north').length / points.length * 100).toFixed(1),
+    steepPct: +(points.filter(p => p.mask === 'steep').length / points.length * 100).toFixed(1),
+    shadowPct: +(points.filter(p => p.mask === 'shadow').length / points.length * 100).toFixed(1),
+    pointCount: points.length,
+    avgAspectDeg: points.filter(p => p.suitable).length ? Math.round(points.filter(p => p.suitable).reduce((s, p) => s + p.aspectDeg, 0) / points.filter(p => p.suitable).length) : null,
     avgSlopeDeg: avgSlope,
     avgSolarKWhM2: NASA_SOLAR,
+    monthlySolar,
     capacityMW: +(suitableAreaM2 / 10000).toFixed(2),
     landCover,
     soilConsistency,

@@ -23,3 +23,19 @@ dist-ssr
 *.sln
 *.sw?
 *.env
+
+# Data/Test files
+out.json
+test_lc_out.txt
+test_output.txt
+test_analysis.js
+test_api_integrations.js
+test_land_cover.js
+test_small.js
+test_lc_out.txt
+*.txt
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!eslint.config.js

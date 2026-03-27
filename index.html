@@ -5,6 +5,17 @@
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>☀️</text></svg>" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>AuraSol - Güneş Enerjisi Analiz Platformu</title>
+    <script>
+      window.L_DISABLE_3D = true;
+      if (navigator.userAgent.includes("Google-Agent")) {
+        if (typeof gtag === 'function') {
+          gtag('event', 'ai_agent_visit', {
+            event_category: 'AI Bot',
+            event_label: window.location.pathname
+          });
+        }
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
