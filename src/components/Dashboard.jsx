@@ -402,51 +402,10 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
               </p>
               <div className="space-y-3">
                 <button 
-                  onClick={async () => {
-                    setIsExportingPro(true);
-                    try {
-                      const baseC = Math.round(r.suitableAreaHa * 600000);
-                      const cPenalty = (!isFetchingSubstation && nearestSubstationKm !== undefined && (nearestSubstationKm === null || nearestSubstationKm > 10) || r.landCover?.rawVal === 11 || r.landCover?.rawVal === 14 || r.landCover?.rawVal === 20) ? 10 : 0;
-                      const subPen = nearestSubstationKm === null ? 0.4 : (nearestSubstationKm > 10 ? 0.6 : (nearestSubstationKm > 5 ? 0.9 : 1));
-                      const fnScore = Math.round(r.suitableRatioPct * (subPen * (r.landCover?.penalty ?? 1)));
-                      
-                      const payload = {
-                        score: fnScore,
-                        areaM2: Number(r.totalAreaM2),
-                        areaHa: r.totalAreaHa,
-                        elevation: r.avgElevationM,
-                        slope: r.avgSlopeDeg,
-                        radiation: r.avgSolarKWhM2 > 0 ? r.avgSolarKWhM2.toLocaleString('tr-TR') : 'Yetersiz',
-                        capacity: r.capacityMW,
-                        substation: nearestSubstationKm,
-                        landType: r.landCover?.label || 'Bilinmiyor',
-                        soil: r.soilConsistency || 'Bilinmiyor',
-                        mevzuat: r.mevzuatNotu?.text || null,
-                        finalCost: Math.round(baseC * (1 + cPenalty / 100)),
-                        penaltyPct: cPenalty,
-                        monthlySolar: r.monthlySolar
-                      };
-                      
-                      const success = await exportToPDF(payload, 'aura-map-container', 'aura-barchart-container', true);
-                      if (!success) alert("PDF oluşturulurken bir hata oluştu veya harita verileri yüklenemedi.");
-                      else setShowPayment(false);
-                    } catch (err) {
-                      console.error(err);
-                      alert("PDF işlemi başarısız: " + err.message);
-                    } finally {
-                      setIsExportingPro(false);
-                    }
-                  }}
-                  disabled={isExportingPro}
-                  className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold rounded-xl shadow-[0_0_15px_rgba(245,158,11,0.3)] transition-all flex items-center justify-center gap-2"
-                >
-                  {isExportingPro ? <span className="animate-pulse">Rapor İşleniyor...</span> : <>Ödemeye Geç <span className="text-[10px] font-semibold opacity-75">(Demo: PDF Üret)</span></>}
-                </button>
-                <button 
                   onClick={() => window.open('https://wa.me/905055621024')}
-                  className="w-full py-3 px-4 bg-[#25D366]/10 hover:bg-[#25D366]/20 border border-[#25D366]/50 text-[#25D366] font-bold rounded-xl shadow-lg transition-colors flex items-center justify-center gap-2"
+                  className="w-full py-3 px-4 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black font-bold rounded-xl shadow-[0_0_20px_rgba(245,158,11,0.4)] transition-all flex items-center justify-center gap-2 transform active:scale-95"
                 >
-                  WhatsApp ile İletişime Geç
+                  <zap className="fill-current" size={16} /> Ödemeye Geç
                 </button>
               </div>
             </div>
