@@ -56,17 +56,30 @@ const MaskBar = ({ label, pct, color }) => (
 
 const PRO_TEST_MODE = false; // TEST MODE: Set to true to bypass blur/locks for testing detailed reports
 
-const ProLockOverlay = ({ children, onUnlock }) => {
+const ProLockOverlay = ({ children, title, icon: Icon, onUnlock }) => {
   if (PRO_TEST_MODE) return <>{children}</>;
   return (
-    <div className="relative group overflow-hidden rounded-xl">
-      <div className="blur-sm opacity-50 pointer-events-none select-none transition-all">
-        {children}
-      </div>
-      <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-slate-950/40 opacity-90 transition-colors">
-         <button onClick={onUnlock} className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-amber-500 to-amber-600 text-black font-bold rounded-lg shadow-xl shadow-amber-900/50 hover:scale-105 transition-transform text-xs">
-            <Lock size={14} /> Profesyonel Raporla Kilidi Aç
-         </button>
+    <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 relative group overflow-hidden">
+      {title && (
+        <div className="flex justify-between items-center mb-4">
+          <span className="text-slate-300 text-sm font-semibold flex items-center gap-2">
+            {Icon && <Icon size={14} className="text-amber-400"/>} {title}
+          </span>
+          <span className="text-[9px] text-slate-500 font-mono tracking-widest uppercase italic">PREMIUM</span>
+        </div>
+      )}
+      <div className="relative">
+        <div className="blur-md opacity-20 pointer-events-none select-none transition-all">
+          {children}
+        </div>
+        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center">
+           <button 
+             onClick={onUnlock} 
+             className="flex items-center gap-2 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-lg shadow-xl shadow-amber-900/50 hover:scale-105 transition-transform text-[10px] uppercase"
+           >
+              <Lock size={12} /> Detayları Gör
+           </button>
+        </div>
       </div>
     </div>
   );
@@ -259,96 +272,66 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
             
             {/* Recharts BarChart (Locked in UI but exported in Pro PDF) */}
             {r.monthlySolar && r.monthlySolar.length > 0 && (
-              <ProLockOverlay onUnlock={() => setShowPayment(true)}>
-                <div className="bg-slate-800/40 rounded-xl p-4 border border-slate-700/50 shadow-inner">
-                  <div className="flex justify-between items-center mb-4">
-                    <span className="text-slate-300 text-sm font-semibold flex items-center gap-2"><Activity size={14} className="text-amber-400"/> 12 Aylık Üretim Potansiyeli</span>
-                    <span className="text-[10px] text-slate-500 font-mono tracking-widest uppercase">kWh/m²</span>
-                  </div>
-                  <div id="aura-barchart-container" className="h-44 w-full" style={{ backgroundColor: '#0f172a' }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={r.monthlySolar} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
-                        <XAxis dataKey="monthName" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
-                        <YAxis stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
-                        <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '12px' }} itemStyle={{ color: '#fbbf24' }} formatter={(val) => [`${val} kWh/m²`, 'Üretim']} labelStyle={{ color: '#cbd5e1', marginBottom: '4px', fontWeight: 'bold' }}/>
-                        <Bar dataKey="kWhM2Month" radius={[4, 4, 0, 0]}>
-                          {r.monthlySolar.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.kWhM2Month > 140 ? '#f59e0b' : '#3b82f6'} />
-                          ))}
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
+              <ProLockOverlay title="12 Aylık Üretim Potansiyeli" icon={Activity} onUnlock={() => setShowPayment(true)}>
+                <div id="aura-barchart-container" className="h-40 w-full" style={{ backgroundColor: '#0f172a' }}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={r.monthlySolar} margin={{ top: 10, right: 0, left: -25, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#334155" vertical={false} />
+                      <XAxis dataKey="monthName" stroke="#94a3b8" fontSize={10} tickLine={false} axisLine={false} />
+                      <YAxis stroke="#475569" fontSize={10} tickLine={false} axisLine={false} />
+                      <Tooltip cursor={{ fill: 'rgba(255,255,255,0.05)' }} contentStyle={{ backgroundColor: '#0f172a', borderColor: '#334155', borderRadius: '8px', fontSize: '12px' }} itemStyle={{ color: '#fbbf24' }} formatter={(val) => [`${val} kWh/m²`, 'Üretim']} labelStyle={{ color: '#cbd5e1', marginBottom: '4px', fontWeight: 'bold' }}/>
+                      <Bar dataKey="kWhM2Month" radius={[4, 4, 0, 0]}>
+                        {r.monthlySolar.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.kWhM2Month > 140 ? '#f59e0b' : '#3b82f6'} />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
               </ProLockOverlay>
             )}
 
-            <ProLockOverlay onUnlock={() => setShowPayment(true)}>
-              <div className="grid grid-cols-2 gap-3 mb-3">
-                <Card label="Tahmini Kapasite" value={`${r.capacityMW} MW`} sub="~1 MW/ha" icon={<Zap size={14}/>} accent="purple" />
-                <Card label="Tahmini Yatırım" value={`$${(finalCost/1000000).toFixed(1)}M`} sub={`${costPenaltyPct > 0 ? '+%10 İzin Payı' : 'Genel Ortalama'}`} icon={<DollarSign size={14}/>} accent={costPenaltyPct > 0 ? "yellow" : "green"} />
+            <ProLockOverlay title="Tahmini Kapasite & Yatırım" icon={Zap} onUnlock={() => setShowPayment(true)}>
+              <div className="grid grid-cols-2 gap-3">
+                <Card label="Kapasite (Tahmini)" value={`${r.capacityMW} MW`} sub="~1 MW / Ha" icon={<Zap size={12}/>} accent="purple" />
+                <Card label="Tahmini Yatırım" value={`$${(finalCost/1000000).toFixed(1)}M`} sub={`${costPenaltyPct > 0 ? '+%10 İzin Payı' : 'Genel Ortalama'}`} icon={<DollarSign size={12}/>} accent={costPenaltyPct > 0 ? "yellow" : "green"} />
               </div>
             </ProLockOverlay>
             
-            <ProLockOverlay onUnlock={() => setShowPayment(true)}>
+            <ProLockOverlay title="Arazi & Zemin Türü" icon={MapPin} onUnlock={() => setShowPayment(true)}>
               <Card
-                label="Arazi & Zemin Türü"
+                label="Mevcut Kullanım"
                 value={r.landCover?.label || 'Bilinmiyor'}
                 sub={r.soilConsistency || 'Veri Yok'}
-                icon={<MapPin size={14}/>}
+                icon={<MapPin size={12}/>}
                 accent={isProtectedArea ? 'red' : (r.landCover?.level === 'warning' ? 'yellow' : r.landCover?.level === 'ideal' ? 'green' : 'slate')}
               />
             </ProLockOverlay>
-            <ProLockOverlay onUnlock={() => setShowPayment(true)}>
+
+            <ProLockOverlay title="Mevzuat & İzin Analizi" icon={ShieldAlert} onUnlock={() => setShowPayment(true)}>
               {r.mevzuatNotu && (
                 <div className={`border rounded-xl p-3 text-xs leading-relaxed ${r.mevzuatNotu.banner}`}>
-                  <div className="font-black mb-1">{r.mevzuatNotu.icon} MEVZUAT NOTU: {r.mevzuatNotu.prefix}</div>
+                  <div className="font-black mb-1">{r.mevzuatNotu.icon} SONUÇ: {r.mevzuatNotu.prefix}</div>
                   <div>{r.mevzuatNotu.text}</div>
-                  {r.landCover?.costImpactPct > 0 && (
-                    <div className="mt-1.5 font-semibold border-t border-current/20 pt-1.5">
-                      💰 Maliyet Etkisi: Tahmini yatırım maliyetine +%{r.landCover.costImpactPct} İzin & Bürokrasi Payı eklenmesi önerilir.
-                    </div>
-                  )}
                 </div>
               )}
             </ProLockOverlay>
 
             {/* Nearest Substation */}
             {(isFetchingSubstation || nearestSubstationKm !== undefined) && (
-              <ProLockOverlay onUnlock={() => setShowPayment(true)}>
-                <div className={`border rounded-xl p-3 bg-slate-800/40 ${
-                  isFetchingSubstation
-                    ? 'border-slate-600/40'
-                    : nearestSubstationKm === null
-                      ? 'border-slate-600/40'
-                      : nearestSubstationKm <= 5
-                        ? 'border-emerald-500/30'
-                        : nearestSubstationKm <= 10
-                          ? 'border-yellow-500/30'
-                          : 'border-red-500/30'
+              <ProLockOverlay title="Şebeke ve Trafo Mesafesi" icon={Cable} onUnlock={() => setShowPayment(true)}>
+                <div className={`border rounded-xl p-3 ${
+                  isFetchingSubstation ? 'border-slate-600/40' : nearestSubstationKm === null ? 'border-slate-600/40' : nearestSubstationKm <= 5 ? 'border-emerald-500/30' : nearestSubstationKm <= 10 ? 'border-yellow-500/30' : 'border-red-500/30'
                 }`}>
-                  <div className="flex justify-between items-center">
-                    <span className="flex items-center gap-1.5 font-bold text-sm text-slate-300">
-                      <Cable size={14} className={
-                        isFetchingSubstation ? "text-slate-400" :
-                        nearestSubstationKm === null ? "text-slate-400" : 
-                        nearestSubstationKm > 10 ? "text-red-400" : "text-blue-400"
-                      } />
-                      Şebeke ve Trafo Mesafesi
-                    </span>
-                  </div>
-                  <div className="mt-2 flex items-baseline gap-2">
+                  <div className="flex items-baseline gap-2">
                     {isFetchingSubstation ? (
                       <span className="text-xl font-bold font-mono animate-pulse">Aranıyor...</span>
-                    ) : nearestSubstationKm === null ? (
-                      <span className="text-sm font-bold text-slate-400">15km dahilinde trafo bulunamadı.</span>
                     ) : (
                       <>
-                        <span className={`text-xl font-black font-mono ${nearestSubstationKm > 10 ? 'text-red-400' : 'text-blue-400'}`}>
-                          {nearestSubstationKm} <span className="text-sm">km</span>
+                        <span className={`text-xl font-black font-mono ${nearestSubstationKm > 10 || nearestSubstationKm === null ? 'text-red-400' : 'text-blue-400'}`}>
+                          {nearestSubstationKm || '15+'} <span className="text-sm">km</span>
                         </span>
-                        <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Mesafe</span>
+                        <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Kuş Uçuşu</span>
                       </>
                     )}
                   </div>
@@ -357,28 +340,17 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
             )}
 
             {/* Verdict */}
-            <ProLockOverlay onUnlock={() => setShowPayment(true)}>
+            <ProLockOverlay title="Yatırım Karar Özeti (Verdict)" icon={Activity} onUnlock={() => setShowPayment(true)}>
               <div className={`p-3 rounded-xl border text-xs leading-relaxed ${
                 isProtectedArea ? 'bg-red-500/10 border-red-500/30 text-red-300'
-                : hasSubstationWarning ? 'bg-red-500/10 border-red-500/30 text-red-300'
                 : finalScore > 40 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                : finalScore > 15 ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300'
-                : 'bg-red-500/10 border-red-500/30 text-red-300'
+                : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-300'
               }`}>
                 {isProtectedArea
-                  ? `Kritik Uyarı: ${r.landCover?.type || 'Korunacak Alan'} tespit edildi. (${r.landCover?.warning}) GES kurulumu mevzuat gereği yapılamaz.`
-                  : hasSubstationWarning
-                  ? 'Dikkat: Yakınlarda trafo merkezi bulunamadı veya mesafe >10km. Şebeke bağlantı maliyeti yatırımın fizibilitesini imkansız kılabilir.'
+                  ? `Kritik Uyarı: GES kurulumu mevzuat gereği bu alanda yapılamaz.`
                   : finalScore > 40
-                  ? '✅ Bu alan GES kurulumu için yüksek potansiyel taşımaktadır. Topoğrafya ve şebeke durumu uygun.'
-                  : finalScore > 15
-                  ? '⚠️ Alan kısmen uygun. Kuzey yamaçlar, dik bölgeler veya şebeke uzaklığı fizibiliteyi zorluyor.'
-                  : '❌ Alanın büyük bölümü topoğrafik engeller veya şebeke bağlantı yetersizliği nedeniyle uygun değil.'}
-                {r.landCover?.warning && !isProtectedArea && (
-                  <div className="mt-2 text-yellow-400 font-semibold border-t border-yellow-500/20 pt-2">
-                    ⚠️ Ek Not: {r.landCover.warning}
-                  </div>
-                )}
+                  ? '✅ Bu alan GES kurulumu için yüksek potansiyel taşımaktadır.'
+                  : '⚠️ Saha verileri yatırım için kısıtlı uygunluk göstermektedir.'}
               </div>
             </ProLockOverlay>
 
