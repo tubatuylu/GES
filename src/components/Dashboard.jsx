@@ -54,7 +54,7 @@ const MaskBar = ({ label, pct, color }) => (
   </div>
 );
 
-const PRO_TEST_MODE = false; // TEST MODE: Set to true to bypass blur/locks for testing detailed reports
+const PRO_TEST_MODE = true; // TEST MODE: Set to true to bypass blur/locks for testing detailed reports
 
 const ProLockOverlay = ({ children, title, icon: Icon, onUnlock }) => {
   if (PRO_TEST_MODE) return <>{children}</>;
