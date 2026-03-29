@@ -399,3 +399,4 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
     </div>
   );
 }
+}
