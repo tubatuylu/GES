@@ -3,6 +3,13 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import React, { useState } from 'react';
 import { exportToPDF } from '../utils/pdfExport';
 
+// Dashboard fonksiyonunun hemen içine ekle:
+const [isProUser, setIsProUser] = useState(false); 
+
+// PRO_TEST_MODE yerine her yerde isProUser kullan:
+const ProLockOverlay = ({ children, title, icon: Icon, onUnlock }) => {
+  if (isProUser) return <>{children}</>; // Kilit artık bu state'e bağlı
+  // ... geri kalan kod aynı
 const ASPECT_LABELS = [
   [0,   45,  '↑ Kuzey — Uygun Değil 🔴'],
   [45,  90,  '↗ Kuzeydoğu — Zayıf'],
