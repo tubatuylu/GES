@@ -10,7 +10,16 @@
 
 const TKGM_BASE = 'https://cbsapi.tkgm.gov.tr/megsiswebapi.v3/api';
 
-// ─── Tier 1: Local Vite proxy (rewrites /tkgm-api → TKGM base) ────────────
+// ─── Tier 1: Direct (might work if CORS is disabled or in some environments) ─
+async function fetchDirect(endpoint) {
+  const res = await fetch(`${TKGM_BASE}${endpoint}`, {
+    headers: { 'Accept': 'application/json' },
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// ─── Tier 2: Local Vite proxy (rewrites /tkgm-api → TKGM base) ────────────
 async function fetchLocal(endpoint) {
   const res = await fetch(`/tkgm-api${endpoint}`, {
     headers: { 'Accept': 'application/json' },
@@ -19,7 +28,7 @@ async function fetchLocal(endpoint) {
   return res.json();
 }
 
-// ─── Tier 2: corsproxy.io ─────────────────────────────────────────────────
+// ─── Tier 3: corsproxy.io ─────────────────────────────────────────────────
 async function fetchCorsproxy(endpoint) {
   const target = encodeURIComponent(`${TKGM_BASE}${endpoint}`);
   const res = await fetch(`https://corsproxy.io/?${target}`, {
@@ -29,7 +38,15 @@ async function fetchCorsproxy(endpoint) {
   return res.json();
 }
 
-// ─── Tier 3: allorigins.win ───────────────────────────────────────────────
+// ─── Tier 4: Codetabs Proxy ───────────────────────────────────────────────
+async function fetchCodetabs(endpoint) {
+  const target = encodeURIComponent(`${TKGM_BASE}${endpoint}`);
+  const res = await fetch(`https://api.codetabs.com/v1/proxy?quest=${target}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// ─── Tier 5: allorigins.win (Last resort) ──────────────────────────────────
 async function fetchAllOrigins(endpoint) {
   const target = encodeURIComponent(`${TKGM_BASE}${endpoint}`);
   const res = await fetch(`https://api.allorigins.win/get?url=${target}`);
@@ -43,30 +60,32 @@ async function fetchAllOrigins(endpoint) {
 async function tkgmFetch(endpoint) {
   const strategies = [
     { name: 'local-proxy', fn: () => fetchLocal(endpoint) },
-    { name: 'corsproxy.io', fn: () => fetchCorsproxy(endpoint) },
-    { name: 'allorigins', fn: () => fetchAllOrigins(endpoint) },
+    { name: 'direct',      fn: () => fetchDirect(endpoint) },
+    { name: 'corsproxy',   fn: () => fetchCorsproxy(endpoint) },
+    { name: 'codetabs',    fn: () => fetchCodetabs(endpoint) },
+    { name: 'allorigins',  fn: () => fetchAllOrigins(endpoint) },
   ];
 
-  let lastError;
+  let errors = [];
   for (const { name, fn } of strategies) {
     try {
       console.log(`[TKGM] Trying strategy: ${name} for ${endpoint}`);
       const data = await Promise.race([
         fn(),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 30000)
+          setTimeout(() => reject(new Error('timeout')), 25000)
         ),
       ]);
       console.log(`[TKGM] ${name} success!`);
       return data;
     } catch (err) {
       console.warn(`[TKGM] ${name} failed:`, err.message);
-      lastError = err;
+      errors.push(`${name}: ${err.message}`);
       // Small pause before next strategy
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 400));
     }
   }
-  throw new Error(`TKGM API erişilemiyor: ${lastError?.message || 'Bilinmeyen hata'}`);
+  throw new Error(`TKGM API'ye hiçbir yöntemle erişilemedi. Hatalar: ${errors.join(' | ')}`);
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────────
