@@ -183,25 +183,6 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
           return (
           <div id="dashboard-content" className="space-y-3 pb-4">
             <div className="flex gap-2">
-              <button 
-                onClick={async () => {
-                  setIsExportingFree(true);
-                  try {
-                    const success = await exportToPDF(payloadData, 'aura-map-container', 'aura-barchart-container', false);
-                    if (!success) alert("PDF oluşturulurken bir hata oluştu veya harita verileri yüklenemedi.");
-                  } catch (err) {
-                    console.error(err);
-                    alert("PDF işlemi başarısız: " + err.message);
-                  } finally {
-                    setIsExportingFree(false);
-                  }
-                }}
-                disabled={isExportingFree}
-                className={`flex-1 bg-slate-800 hover:bg-slate-700 text-[11px] py-2.5 px-2 rounded-xl text-white font-semibold transition-colors flex items-center justify-center gap-1 ${isExportingFree ? 'opacity-70 cursor-wait' : ''}`}
-              >
-                {isExportingFree ? 'Hazırlanıyor...' : 'Ücretsiz Özet İndir'}
-              </button>
-              
                 <button
                   onClick={async () => {
                     if (PRO_TEST_MODE) {
@@ -216,9 +197,9 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
                     }
                   }}
                   disabled={isExportingPro}
-                  className="flex-[1.5] bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black text-[12px] py-2.5 px-2 rounded-xl font-bold shadow-lg shadow-amber-900/40 transition-all flex items-center justify-center gap-1 hover:scale-[1.02] disabled:opacity-70 disabled:cursor-wait"
+                  className="flex-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-black text-[12px] py-2.5 px-2 rounded-xl font-bold shadow-lg shadow-amber-900/40 transition-all flex items-center justify-center gap-1 hover:scale-[1.02] disabled:opacity-70 disabled:cursor-wait"
                 >
-                  <Download size={14}/> {isExportingPro ? 'Rapor İşleniyor...' : 'Detaylı Fizibilite Al'}
+                  <Download size={14}/> {isExportingPro ? 'Rapor İşleniyor...' : 'Detaylı Fizibilite Raporu Al'}
                 </button>
             </div>
 
