@@ -132,18 +132,45 @@ const AnalysisOverlay = ({ points }) => {
   return null;
 };
 
+// Drawn polygon overlay (user-drawn blue dashed)
 const PolygonOverlay = ({ polygon }) => {
   const map = useMap();
+  const layerRef = useRef(null);
   useEffect(() => {
+    if (layerRef.current) { map.removeLayer(layerRef.current); layerRef.current = null; }
     if (!polygon || polygon.length === 0) return;
-    const polyLayer = L.polygon(polygon, { 
-      color: '#3b82f6', 
-      weight: 4, 
-      fillColor: '#3b82f6', 
+    const polyLayer = L.polygon(polygon, {
+      color: '#3b82f6',
+      weight: 4,
+      fillColor: '#3b82f6',
       fillOpacity: 0.2,
-      dashArray: '5, 5'
+      dashArray: '6, 6',
     }).addTo(map);
+    layerRef.current = polyLayer;
     return () => { map.removeLayer(polyLayer); };
+  }, [polygon, map]);
+  return null;
+};
+
+// TKGM parcel overlay (orange solid border, distinct from user drawings)
+const ParcelOverlay = ({ polygon }) => {
+  const map = useMap();
+  const layerRef = useRef(null);
+  useEffect(() => {
+    if (layerRef.current) { map.removeLayer(layerRef.current); layerRef.current = null; }
+    if (!polygon || polygon.length === 0) return;
+    const poly = L.polygon(polygon, {
+      color: '#f59e0b',
+      weight: 3,
+      fillColor: '#f59e0b',
+      fillOpacity: 0.12,
+    });
+    poly.addTo(map);
+    // Auto-zoom to parcel
+    try { map.fitBounds(poly.getBounds(), { padding: [40, 40], animate: true }); } catch (_) {}
+    poly.bindPopup(`<b>&#x1F4D0; TKGM Parseli</b><br/>Kadastro siniri MEGSIS'ten alindi.`).openPopup();
+    layerRef.current = poly;
+    return () => { map.removeLayer(poly); };
   }, [polygon, map]);
   return null;
 };
@@ -164,11 +191,13 @@ export default function Analyzer({ onBack }) {
   const [analysisError, setAnalysisError] = useState(null);
   const [nearestSubstationKm, setNearestSubstationKm] = useState(null);
   const [isFetchingSubstation, setIsFetchingSubstation] = useState(false);
-  
+
   // States for hidden map sync
-  const [mapCenter, setMapCenter] = useState([41.1, 41.1]);
+  const [mapCenter, setMapCenter] = useState([39, 35]);
   const [mapBounds, setMapBounds] = useState(null);
   const [drawnPolygon, setDrawnPolygon] = useState(null);
+  // TKGM parcel polygon (shown with distinct orange style)
+  const [parcelPolygon, setParcelPolygon] = useState(null);
 
   const layers = { dem: activeLayer === 'dem', slope: activeLayer === 'slope', aspect: activeLayer === 'aspect' };
 
@@ -228,9 +257,31 @@ export default function Analyzer({ onBack }) {
     }
   }, []);
 
+  const handleParcelSelected = useCallback((parcelData) => {
+    if (!parcelData || !parcelData.geometry) return;
+
+    // Megsis v3 returns { geometry: { type: 'Polygon', coordinates: [[[lng, lat], ...]] } }
+    const rawCoords = parcelData.geometry.type === 'MultiPolygon'
+      ? parcelData.geometry.coordinates[0][0]   // take first ring of first polygon
+      : parcelData.geometry.coordinates[0];      // first ring of single polygon
+
+    const latlngs = rawCoords.map(c => ({ lat: c[1], lng: c[0] }));
+
+    // Show the TKGM parcel in orange, clear any previously drawn polygon
+    setParcelPolygon(latlngs);
+    setDrawnPolygon(null);
+
+    // Run the GES analysis on the parcel boundary
+    handlePolygonDrawn(latlngs);
+  }, [handlePolygonDrawn]);
+
   return (
     <div className="flex flex-col md:flex-row w-full h-[100dvh] overflow-hidden bg-slate-950 text-slate-200 antialiased">
-      <Sidebar layers={layers} toggleLayer={handleLayerToggle} />
+      <Sidebar 
+        layers={layers} 
+        toggleLayer={handleLayerToggle} 
+        onParcelSelected={handleParcelSelected} 
+      />
 
       <main className="flex-1 flex flex-col md:flex-row overflow-hidden relative">
         <button
@@ -252,9 +303,10 @@ export default function Analyzer({ onBack }) {
           <MapContainer center={[39, 35]} zoom={6} scrollWheelZoom style={{ width: '100%', height: '100%' }}>
             <ChangeView center={mapCenter} bounds={mapBounds ? L.latLngBounds(mapBounds) : null} />
             <DynamicTile layer={activeLayer} />
-            <DrawControl onPolygonDrawn={handlePolygonDrawn} />
+            <DrawControl onPolygonDrawn={(latlngs) => { setParcelPolygon(null); handlePolygonDrawn(latlngs); }} />
             <AnalysisOverlay points={analysisResult?.points} />
             <PolygonOverlay polygon={drawnPolygon} />
+            <ParcelOverlay polygon={parcelPolygon} />
           </MapContainer>
 
           {/* HIDDEN TRIPLE MAP EXPORT CONTAINER FOR PRO PDF */}
