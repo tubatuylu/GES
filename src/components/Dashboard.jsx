@@ -58,29 +58,30 @@ const MaskBar = ({ label, pct, color }) => (
 const PRO_TEST_MODE = true; // ALL FEATURES UNLOCKED: Free version for all users
 
 const ProLockOverlay = ({ children, title, icon: Icon, onUnlock }) => {
-  if (PRO_TEST_MODE) return <>{children}</>;
   return (
-    <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 relative group overflow-hidden">
+    <div className="bg-slate-800/40 border border-slate-700/50 rounded-xl p-4 relative group">
       {title && (
         <div className="flex justify-between items-center mb-4">
           <span className="text-slate-300 text-sm font-semibold flex items-center gap-2">
             {Icon && <Icon size={14} className="text-amber-400"/>} {title}
           </span>
-          <span className="text-[9px] text-slate-500 font-mono tracking-widest uppercase italic">PREMIUM</span>
+          {!PRO_TEST_MODE && <span className="text-[9px] text-slate-500 font-mono tracking-widest uppercase italic">PREMIUM</span>}
         </div>
       )}
       <div className="relative">
-        <div className="blur-md opacity-20 pointer-events-none select-none transition-all">
+        <div className={!PRO_TEST_MODE ? "blur-md opacity-20 pointer-events-none select-none transition-all" : ""}>
           {children}
         </div>
-        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center">
-           <button 
-             onClick={onUnlock} 
-             className="flex items-center gap-2 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-lg shadow-xl shadow-amber-900/50 hover:scale-105 transition-transform text-[10px] uppercase"
-           >
-              <Lock size={12} /> Detayları Gör
-           </button>
-        </div>
+        {!PRO_TEST_MODE && (
+          <div className="absolute inset-0 z-20 flex flex-col items-center justify-center">
+             <button 
+               onClick={onUnlock} 
+               className="flex items-center gap-2 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded-lg shadow-xl shadow-amber-900/50 hover:scale-105 transition-transform text-[10px] uppercase"
+             >
+                <Lock size={12} /> Detayları Gör
+             </button>
+          </div>
+        )}
       </div>
     </div>
   );
