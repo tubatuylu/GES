@@ -16,6 +16,8 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
         rewrite: (path) => path.replace(/^\/tkgm-api/, '/megsiswebapi.v3/api'),
+        proxyTimeout: 60000, // wait up to 1m for TKGM response
+        timeout: 60000,      // wait up to 1m for target connection
         // Mimic a real browser request from TKGM's own parselsorgu site
         headers: {
           'Referer': 'https://parselsorgu.tkgm.gov.tr/',

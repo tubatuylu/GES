@@ -50,16 +50,20 @@ async function tkgmFetch(endpoint) {
   let lastError;
   for (const { name, fn } of strategies) {
     try {
+      console.log(`[TKGM] Trying strategy: ${name} for ${endpoint}`);
       const data = await Promise.race([
         fn(),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), 12000)
+          setTimeout(() => reject(new Error('timeout')), 30000)
         ),
       ]);
+      console.log(`[TKGM] ${name} success!`);
       return data;
     } catch (err) {
       console.warn(`[TKGM] ${name} failed:`, err.message);
       lastError = err;
+      // Small pause before next strategy
+      await new Promise(r => setTimeout(r, 500));
     }
   }
   throw new Error(`TKGM API erişilemiyor: ${lastError?.message || 'Bilinmeyen hata'}`);
