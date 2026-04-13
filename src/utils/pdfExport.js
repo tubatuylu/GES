@@ -269,8 +269,8 @@ export async function exportToPDF(data, mapElementId, chartElementId, isPro = fa
         }
         pdf.setFont("helvetica", "normal");
         pdf.setFontSize(8);
-        pdf.text("GEOVERA Bilisim A.S. | AuraSol CBS ve Yapay Zeka servisi tarafindan dijital yollarla uretilmistir.", 15, pdfH - 12);
-        pdf.text("Kesin yatirim karari icin fiili saha etudu gereklidir.", 15, pdfH - 8);
+        pdf.text("Bu rapor dijital veriler kullanilarak otomatik uretilmistir.", 15, pdfH - 12);
+        pdf.text("Kesin yatirim karari ve ifraz surecleri icin yerinde saha etudu gereklidir.", 15, pdfH - 8);
     }
 
     pdf.save(`AuraSol_${isPro ? 'Pro' : 'Ozet'}_Fizibilite_${Date.now()}.pdf`);

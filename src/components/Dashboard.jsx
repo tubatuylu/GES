@@ -102,6 +102,10 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
         <p className="text-slate-500 text-xs mt-0.5">
           NASA POWER SATELLITE • MAPBOX TERRAIN • OSM NETWORK
         </p>
+        <div className="flex gap-2 mt-2">
+          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">Alan Sınırı Genişletildi</span>
+          <span className="bg-blue-500/10 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">Resmi MEGSİS Verisi Aktif</span>
+        </div>
       </div>
 
       <div className="flex-1 p-4 space-y-3">

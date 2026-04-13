@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { MapContainer, TileLayer, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap, LayersControl } from 'react-leaflet';
 import { ArrowLeft } from 'lucide-react';
 import L from 'leaflet';
 
@@ -24,6 +24,7 @@ L.Icon.Default.mergeOptions({
 
 // ── Tile URLs per analysis layer ──────────────────────────────────────────────
 const TILES = {
+  satellite: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', attr: '&copy; Esri World Imagery' },
   standard: { url: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', attr: '&copy; OpenStreetMap' },
   dem: { url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', attr: '&copy; OpenTopoMap' },
   slope: { url: 'https://server.arcgisonline.com/ArcGIS/rest/services/Elevation/World_Hillshade/MapServer/tile/{z}/{y}/{x}', attr: '&copy; Esri Hillshade' },
@@ -40,7 +41,9 @@ const MASK_COLOR = {
 // ── Sub-components ────────────────────────────────────────────────────────────
 
 const DynamicTile = ({ layer }) => {
-  const t = TILES[layer] || TILES.standard;
+  if (layer === 'standard') return null;
+  const t = TILES[layer];
+  if (!t) return null;
   return <TileLayer key={layer} url={t.url} attribution={t.attr} maxZoom={17} crossOrigin="anonymous" />;
 };
 
@@ -301,9 +304,17 @@ export default function Analyzer({ onBack }) {
             </div>
           )}
           <MapContainer center={[39, 35]} zoom={6} scrollWheelZoom style={{ width: '100%', height: '100%' }}>
+            <LayersControl position="topright">
+              <LayersControl.BaseLayer checked name="Uydu Görünümü">
+                <TileLayer url={TILES.satellite.url} attribution={TILES.satellite.attr} maxZoom={19} />
+              </LayersControl.BaseLayer>
+              <LayersControl.BaseLayer name="Sokak Görünümü">
+                <TileLayer url={TILES.standard.url} attribution={TILES.standard.attr} maxZoom={19} />
+              </LayersControl.BaseLayer>
+            </LayersControl>
             <ChangeView center={mapCenter} bounds={mapBounds ? L.latLngBounds(mapBounds) : null} />
             <DynamicTile layer={activeLayer} />
-            <DrawControl onPolygonDrawn={(latlngs) => { setParcelPolygon(null); handlePolygonDrawn(latlngs); }} />
+            <DrawControl onPolygonDrawn={(latlngs) => { handlePolygonDrawn(latlngs); }} />
             <AnalysisOverlay points={analysisResult?.points} />
             <PolygonOverlay polygon={drawnPolygon} />
             <ParcelOverlay polygon={parcelPolygon} />
@@ -320,12 +331,12 @@ export default function Analyzer({ onBack }) {
               visibility: 'visible', opacity: 1, overflow: 'hidden'
             }}
           >
-            {['dem', 'slope', 'aspect', 'standard'].map((l) => {
+            {['dem', 'slope', 'aspect', 'satellite'].map((l) => {
               const boundsObj = mapBounds ? L.latLngBounds(mapBounds) : null;
               return (
                 <div key={l} className="flex-1 h-full bg-slate-100 flex flex-col border border-slate-300">
                   <div className="bg-slate-800 text-white text-center text-[10px] py-1 font-bold uppercase tracking-wider">
-                    {l === 'dem' ? 'Arazi Topografyası' : l === 'slope' ? 'Eğim Analizi' : l === 'aspect' ? 'Bakı Analizi' : 'Saha Görünümü'}
+                    {l === 'dem' ? 'Arazi Topografyası' : l === 'slope' ? 'Eğim Analizi' : l === 'aspect' ? 'Bakı Analizi' : 'Uydu Görünümü'}
                   </div>
                   <div className="flex-1 w-full relative">
                     <MapContainer 

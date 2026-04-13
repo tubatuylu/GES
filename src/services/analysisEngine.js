@@ -233,9 +233,9 @@ export async function runGESAnalysis(latlngs) {
   const avgLat = latlngs.reduce((s, p) => s + p.lat, 0) / latlngs.length;
   const avgLng = latlngs.reduce((s, p) => s + p.lng, 0) / latlngs.length;
 
-  if (area > 20000000) throw new Error('Seçilen alan çok büyük (Maks 20km²).');
+  if (area > 200000000) throw new Error('Seçilen alan çok büyük (Maks 200km²).');
 
-  const N = area < 50000 ? 7 : area < 200000 ? 8 : area < 1000000 ? 9 : 11;
+  const N = area < 50000 ? 7 : area < 200000 ? 8 : area < 1000000 ? 9 : area < 5000000 ? 10 : area < 20000000 ? 11 : area < 50000000 ? 12 : 15;
   const { grid, allCoords, latStep, lngStep } = buildGrid(latlngs, N);
 
   const [elevations, nasaData, landCoverVal] = await Promise.all([
