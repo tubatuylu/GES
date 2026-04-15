@@ -1,7 +1,8 @@
-import { Activity, MapPin, TrendingUp, Sun, Zap, ShieldAlert, Eye, Cable, DollarSign, Download, Lock, X } from 'lucide-react';
+import { Activity, MapPin, TrendingUp, Sun, Zap, ShieldAlert, Eye, Cable, DollarSign, Download, Lock, X, Users } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import React, { useState } from 'react';
 import { exportToPDF } from '../utils/pdfExport';
+import CollaborateModal from './CollaborateModal';
 
 
 const ASPECT_LABELS = [
@@ -91,17 +92,28 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
   const [isExportingFree, setIsExportingFree] = useState(false);
   const [isExportingPro, setIsExportingPro] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
+  const [showCollaborate, setShowCollaborate] = useState(false);
 
   return (
     <div className="w-full md:w-96 bg-slate-900/95 backdrop-blur-md text-white h-auto md:h-full max-h-[45vh] md:max-h-none flex flex-col border-t md:border-t-0 md:border-l border-slate-700 overflow-y-auto shadow-2xl shrink-0">
       {/* Header */}
       <div className="p-5 border-b border-slate-700/60 flex-shrink-0">
-        <h2 className="text-base font-bold flex items-center gap-2">
-          <Activity size={16} className="text-blue-400" /> Analiz Sonuçları
-        </h2>
-        <p className="text-slate-500 text-xs mt-0.5">
-          NASA POWER SATELLITE • MAPBOX TERRAIN • OSM NETWORK
-        </p>
+        <div className="flex justify-between items-start">
+          <div>
+            <h2 className="text-base font-bold flex items-center gap-2">
+              <Activity size={16} className="text-blue-400" /> Analiz Sonuçları
+            </h2>
+            <p className="text-slate-500 text-xs mt-0.5">
+              NASA POWER SATELLITE • MAPBOX TERRAIN • OSM NETWORK
+            </p>
+          </div>
+          <button
+            onClick={() => setShowCollaborate(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg shadow-lg shadow-blue-500/30 transition-all hover:scale-105 hover:shadow-blue-500/50"
+          >
+            <Users size={14} /> Collaborate
+          </button>
+        </div>
         <div className="flex gap-2 mt-2">
           <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">Alan Sınırı Genişletildi</span>
           <span className="bg-blue-500/10 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">Resmi MEGSİS Verisi Aktif</span>
@@ -376,6 +388,8 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
       <div className="p-3 border-t border-slate-800 flex-shrink-0 text-center">
         <p className="text-slate-700 text-[10px] uppercase font-bold tracking-widest">GES Analysis Engine v2.0</p>
       </div>
+
+      <CollaborateModal isOpen={showCollaborate} onClose={() => setShowCollaborate(false)} />
     </div>
   );
 }
