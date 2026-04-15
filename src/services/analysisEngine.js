@@ -227,7 +227,14 @@ function inferSoilConsistency(slope, lcVal) {
 
 // ── Ana Analiz Motoru ─────────────────────────────────────────────────────────
 
-export async function runGESAnalysis(latlngs) {
+/**
+ * @param {Array} latlngs - Polygon vertices
+ * @param {Object} [options] - Optional configuration
+ * @param {boolean} [options.isFieldVerified=false] - Whether drone/field verification is active
+ */
+export async function runGESAnalysis(latlngs, options = {}) {
+  const { isFieldVerified = false } = options;
+
   const area = geodesicAreaM2(latlngs);
   const perimeter = perimeterM(latlngs);
   const avgLat = latlngs.reduce((s, p) => s + p.lat, 0) / latlngs.length;
@@ -303,6 +310,18 @@ export async function runGESAnalysis(latlngs) {
   const soilConsistency = inferSoilConsistency(avgSlope, landCoverVal);
   const mevzuatNotu = getMevzuatNotu(landCover.level);
 
+  // ── Confidence Score (Güven Endeksi) ──
+  // Base score from terrain suitability (0-100), with field verification bonus
+  const FIELD_VERIFICATION_BONUS = 15;
+  const baseConfidence = Math.round(suitableRatio * 100 * (landCover.penalty ?? 1));
+  const confidenceScore = isFieldVerified
+    ? Math.min(100, baseConfidence + FIELD_VERIFICATION_BONUS)
+    : baseConfidence;
+
+  const fieldVerificationNote = isFieldVerified
+    ? "Topoğrafik analiz uydu verileriyle (30m) yapılmış, parselin güncel fiziki durumu yüksek çözünürlüklü saha ortofotosu ile doğrulanmıştır."
+    : null;
+
   return {
     totalAreaM2: Math.round(area),
     totalAreaHa: (area / 10000).toFixed(2),
@@ -323,6 +342,10 @@ export async function runGESAnalysis(latlngs) {
     landCover,
     soilConsistency,
     mevzuatNotu,
+    // ── Hibrit Veri Modeli Alanları ──
+    isFieldVerified,
+    confidenceScore,
+    fieldVerificationNote,
     points,
   };
 }

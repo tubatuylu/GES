@@ -152,6 +152,14 @@ export async function exportToPDF(data, mapElementId, chartElementId, isPro = fa
       drawRow("Sebeke Merkezi Mesafesi", data.substation === null ? "15 km dahilinde trafo bulunamadi" : `${data.substation} km`);
       drawRow("Tahmini Tesis Kapasitesi", `${data.capacity} MW`);
       drawRow("Tahmini Yatirim Butcesi", `$${(data.finalCost/1000000).toFixed(2)} Milyon USD ${data.penaltyPct > 0 ? '(Altyapi ve Izin Kesintisi Dahil)' : ''}`);
+      // Güven Endeksi
+      if (data.confidenceScore !== undefined) {
+        drawRow("Guven Endeksi", `${data.confidenceScore}/100${data.isFieldVerified ? ' (Saha Dogrulama +15)' : ' (Temel Skor)'}`);
+      }
+      // Drone Ortofoto durumu
+      if (data.droneActive) {
+        drawRow("Drone Ortofoto", "Aktif - Yuksek Cozunurluklu Saha Goruntusu Yuklendi");
+      }
     } else {
       drawRow("Trafo / Sebeke Mesafesi", "KILITLI - Pro Raporda Mevcut");
       drawRow("Yatirim Maliyet Analizi", "KILITLI - Pro Raporda Mevcut");
@@ -255,6 +263,53 @@ export async function exportToPDF(data, mapElementId, chartElementId, isPro = fa
       });
 
       currentY += 75;
+    }
+
+    // 4b. FIELD VERIFICATION & ENGINEERING APPROVAL
+    if (isPro) {
+      if (currentY + 50 > pdfH - 25) {
+        pdf.addPage();
+        drawWatermark();
+        currentY = 20;
+      }
+
+      if (data.isFieldVerified) {
+        // Field Verification Box
+        pdf.setFillColor(240, 253, 244); // green-50
+        pdf.setDrawColor(34, 197, 94); // green-500
+        pdf.setLineWidth(0.5);
+        pdf.roundedRect(15, currentY, pdfW - 30, 18, 3, 3, 'FD');
+        pdf.setFontSize(9);
+        pdf.setFont("helvetica", "bold");
+        pdf.setTextColor(22, 101, 52); // green-800
+        pdf.text("SAHA DOGRULAMASI: TAMAMLANDI", 20, currentY + 7);
+        pdf.setFont("helvetica", "normal");
+        pdf.setFontSize(7);
+        pdf.setTextColor(21, 128, 61); // green-700
+        pdf.text("Topografik analiz uydu verileriyle (30m) yapilmis, parselin guncel fiziki durumu yuksek cozunurluklu saha ortofotosu ile dogrulanmistir.", 20, currentY + 13);
+        currentY += 24;
+      }
+
+      // Engineering Approval Box
+      pdf.setFillColor(239, 246, 255); // blue-50
+      pdf.setDrawColor(59, 130, 246); // blue-500
+      pdf.setLineWidth(0.6);
+      pdf.roundedRect(15, currentY, pdfW - 30, 22, 3, 3, 'FD');
+      pdf.setFontSize(10);
+      pdf.setFont("helvetica", "bold");
+      pdf.setTextColor(30, 64, 175); // blue-800
+      pdf.text("MUHENDISLIK ONAY ASAMASI", 20, currentY + 8);
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(7);
+      pdf.setTextColor(37, 99, 235); // blue-600
+      const approvalText = data.isFieldVerified
+        ? "Bu rapor, uydu bazli on analiz ve IHA (Drone) bazli gorsel dogrulama sureclerini icermektedir. Proje 'Yatirima Uygun' asamasina tasinmistir."
+        : "Bu rapor, uydu bazli on analiz surecini icermektedir. Saha dogrulamasi beklenmektedir.";
+      pdf.text(approvalText, 20, currentY + 14);
+      pdf.setFontSize(6);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text(`Rapor ID: AURA-${Date.now().toString(36).toUpperCase()}`, 20, currentY + 19);
+      currentY += 28;
     }
 
     // 5. FOOTER

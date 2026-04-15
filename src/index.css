@@ -38,3 +38,155 @@ body {
 .leaflet-draw-toolbar a {
   background-color: #fff !important;
 }
+
+/* ── Drone Corner Handle Styles ───────────────────────────── */
+.drone-handle {
+  background: none !important;
+  border: none !important;
+}
+
+.drone-corner-handle {
+  width: 22px;
+  height: 22px;
+  background: rgba(245, 158, 11, 0.95);
+  border: 2px solid white;
+  border-radius: 50%;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  color: black;
+  font-weight: bold;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.drone-corner-handle:hover {
+  transform: scale(1.3);
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.6);
+}
+
+.drone-corner-handle:active {
+  cursor: grabbing;
+}
+
+/* ── Professional Stepper Styles ──────────────────────────── */
+.stepper-container {
+  position: relative;
+}
+
+.stepper-circle {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 2;
+}
+
+.stepper-circle-done {
+  background: linear-gradient(135deg, #10b981, #059669);
+  border: 2px solid #34d399;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+}
+
+.stepper-circle-active {
+  background: rgba(245, 158, 11, 0.15);
+  border: 2px solid #f59e0b;
+  animation: stepper-pulse 2s ease-in-out infinite;
+}
+
+.stepper-circle-pending {
+  background: rgba(51, 65, 85, 0.3);
+  border: 2px solid #475569;
+}
+
+.stepper-line-track {
+  width: 3px;
+  height: 28px;
+  background: #1e293b;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stepper-line-progress {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 0%;
+  background: linear-gradient(180deg, #10b981, #34d399);
+  border-radius: 4px;
+  transition: height 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.stepper-line-filled {
+  height: 100%;
+}
+
+/* Confidence gauge SVG animation */
+.stepper-line-fill {
+  transition: stroke-dasharray 1.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Status badges */
+.stepper-badge-done {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.stepper-badge-active {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  animation: stepper-badge-glow 2s ease-in-out infinite;
+}
+
+.stepper-badge-pending {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(71, 85, 105, 0.15);
+  color: #64748b;
+  border: 1px solid rgba(71, 85, 105, 0.3);
+}
+
+/* Keyframes */
+@keyframes stepper-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(245, 158, 11, 0);
+  }
+}
+
+@keyframes stepper-badge-glow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}

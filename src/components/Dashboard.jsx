@@ -1,4 +1,4 @@
-import { Activity, MapPin, TrendingUp, Sun, Zap, ShieldAlert, Eye, Cable, DollarSign, Download, Lock, X, Users } from 'lucide-react';
+import { Activity, MapPin, TrendingUp, Sun, Zap, ShieldAlert, Eye, Cable, DollarSign, Download, Lock, X, Users, CheckCircle } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import React, { useState } from 'react';
 import { exportToPDF } from '../utils/pdfExport';
@@ -88,7 +88,7 @@ const ProLockOverlay = ({ children, title, icon: Icon, onUnlock }) => {
   );
 };
 
-export default function Dashboard({ analysisResult: r, isAnalyzing, analysisError, nearestSubstationKm, isFetchingSubstation }) {
+export default function Dashboard({ analysisResult: r, isAnalyzing, analysisError, nearestSubstationKm, isFetchingSubstation, isFieldVerified = false, droneActive = false }) {
   const [isExportingFree, setIsExportingFree] = useState(false);
   const [isExportingPro, setIsExportingPro] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
@@ -193,7 +193,10 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
             mevzuat: r.mevzuatNotu?.text || null,
             finalCost: finalCost,
             penaltyPct: costPenaltyPct,
-            monthlySolar: r.monthlySolar
+            monthlySolar: r.monthlySolar,
+            isFieldVerified: isFieldVerified,
+            droneActive: droneActive,
+            confidenceScore: r.confidenceScore
           };
 
           return (
@@ -352,6 +355,105 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
                   : '⚠️ Saha verileri yatırım için kısıtlı uygunluk göstermektedir.'}
               </div>
             </ProLockOverlay>
+
+            {/* Field Verification Note */}
+            {isFieldVerified && (
+              <div className="p-3 rounded-xl border bg-teal-500/10 border-teal-500/30 text-teal-300 text-xs leading-relaxed">
+                <div className="font-black mb-1 flex items-center gap-1">
+                  <CheckCircle size={12} /> SAHA DOĞRULAMASI TAMAMLANDI
+                </div>
+                <div>Topografik analiz uydu verileriyle (30m) yapılmış, parselin güncel fiziki durumu yüksek çözünürlüklü saha ortofotosu ile doğrulanmıştır. Güven Endeksi: +15%</div>
+              </div>
+            )}
+
+            {/* Güven Endeksi (Confidence Score) */}
+            {r.confidenceScore !== undefined && (
+              <div className="bg-slate-800/40 rounded-xl p-4">
+                <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                  <Activity size={12} /> Güven Endeksi
+                </p>
+                <div className="flex items-center gap-3">
+                  <div className="relative w-16 h-16 flex-shrink-0">
+                    <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
+                      <circle cx="18" cy="18" r="14" fill="none" stroke="#334155" strokeWidth="3" />
+                      <circle cx="18" cy="18" r="14" fill="none"
+                        stroke={r.confidenceScore >= 70 ? '#10b981' : r.confidenceScore >= 40 ? '#f59e0b' : '#ef4444'}
+                        strokeWidth="3"
+                        strokeDasharray={`${r.confidenceScore * 0.88} 88`}
+                        strokeLinecap="round"
+                        className="stepper-line-fill"
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <span className="text-sm font-black font-mono">{r.confidenceScore}</span>
+                    </div>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-bold">{r.confidenceScore >= 70 ? 'Yüksek Güven' : r.confidenceScore >= 40 ? 'Orta Güven' : 'Düşük Güven'}</div>
+                    <p className="text-[10px] text-slate-500 mt-0.5">
+                      Temel: {Math.min(100, r.confidenceScore - (isFieldVerified ? 15 : 0))} puan
+                      {isFieldVerified && <span className="text-emerald-400 font-bold"> + 15 Saha Doğrulama</span>}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Professional Vertical Stepper */}
+            <div className="bg-slate-800/40 rounded-xl p-4">
+              <p className="text-slate-400 text-xs font-semibold uppercase tracking-wider mb-4 flex items-center gap-1.5">
+                <Activity size={12} /> Süreç Adımları
+              </p>
+              <div className="stepper-container">
+                {[
+                  { label: 'Uydu Taraması', sub: 'NASA POWER & Mapbox Terrain', icon: '🛰️', done: !!r },
+                  { label: 'Resmi Parsel Sorgu', sub: 'TKGM MEGSİS Kadastro', icon: '📋', done: !!r },
+                  { label: 'Saha Veri Girişi', sub: 'Drone Ortofoto Yükleme', icon: '🚁', done: droneActive },
+                  { label: 'Nihai Analiz & Onay', sub: 'Saha Doğrulaması', icon: '✅', done: isFieldVerified },
+                ].map((step, idx, arr) => {
+                  const isActive = !step.done && (idx === 0 || arr[idx - 1].done);
+                  return (
+                    <div key={idx} className="flex gap-3 stepper-step">
+                      {/* Vertical line + circle */}
+                      <div className="flex flex-col items-center">
+                        <div className={`stepper-circle ${
+                          step.done ? 'stepper-circle-done' : isActive ? 'stepper-circle-active' : 'stepper-circle-pending'
+                        }`}>
+                          {step.done ? (
+                            <CheckCircle size={14} className="text-white" />
+                          ) : (
+                            <span className="text-xs">{step.icon}</span>
+                          )}
+                        </div>
+                        {idx < arr.length - 1 && (
+                          <div className="stepper-line-track">
+                            <div className={`stepper-line-progress ${step.done ? 'stepper-line-filled' : ''}`} />
+                          </div>
+                        )}
+                      </div>
+                      {/* Content */}
+                      <div className="pb-5 flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className={`text-xs font-bold ${step.done ? 'text-emerald-400' : isActive ? 'text-amber-400' : 'text-slate-500'}`}>
+                            {step.label}
+                          </p>
+                          {step.done && (
+                            <span className="stepper-badge-done">Tamamlandı</span>
+                          )}
+                          {isActive && (
+                            <span className="stepper-badge-active">Aktif</span>
+                          )}
+                          {!step.done && !isActive && (
+                            <span className="stepper-badge-pending">Bekliyor</span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-slate-600 mt-0.5">{step.sub}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
 
           </div>
           );
