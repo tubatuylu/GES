@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { MapContainer, TileLayer, useMap, useMapEvents, LayersControl } from 'react-leaflet';
-import { ArrowLeft, Upload, CheckCircle, X } from 'lucide-react';
+import { ArrowLeft, Upload, CheckCircle, X, ShieldAlert } from 'lucide-react';
 import exifr from 'exifr';
 import L from 'leaflet';
 
@@ -12,7 +12,7 @@ import '../index.css';
 // Project Components & Services
 import Sidebar from './Sidebar';
 import Dashboard from './Dashboard';
-import { runGESAnalysis, fetchNearestSubstationKm } from '../services/analysisEngine';
+import { runGESAnalysis, fetchNearestSubstationKm, fetchGridLines, haversineKm } from '../services/analysisEngine';
 
 // Leaflet Icon Fix & html2canvas Compatibility
 window.L_DISABLE_3D = true; // Crucial for html2canvas to capture Leaflet tiles correctly
@@ -83,11 +83,13 @@ const DrawControl = ({ onPolygonDrawn }) => {
       });
 
       map.on(L.Draw.Event.CREATED, (e) => {
-        drawnItems.clearLayers();
         drawnItems.addLayer(e.layer);
         if (e.layerType === 'polygon') onPolygonDrawn(e.layer.getLatLngs()[0]);
       });
-      map.on(L.Draw.Event.DELETED, () => onPolygonDrawn(null));
+      // Removing DELETED handler hook mapped to nullification to support multiple layers
+      map.on(L.Draw.Event.DELETED, () => {
+         // handle deletion externally or ignore
+      });
     };
 
     init();
@@ -136,46 +138,139 @@ const AnalysisOverlay = ({ points }) => {
   return null;
 };
 
+// ── Grid Lines Overlay ────────────────────────────────────────────────────────
+const GridLinesOverlay = ({ lines }) => {
+  const map = useMap();
+  const layerRef = useRef(null);
+
+  useEffect(() => {
+    if (layerRef.current) { map.removeLayer(layerRef.current); layerRef.current = null; }
+    if (!lines || lines.length === 0) return;
+
+    const group = L.layerGroup();
+    lines.forEach(line => {
+      let color = '#3b82f6';
+      let weight = 2;
+      let dashArray = null;
+
+      if (line.voltage === '154000' || line.voltage === '154') {
+        color = '#ea580c'; // turuncu
+        weight = 4;
+      } else if (line.voltage === '33000' || line.voltage === '33') {
+        color = '#9333ea'; // mor
+        weight = 3;
+      } else if (line.voltage) {
+        color = '#facc15'; // yellow
+      }
+
+      L.polyline(line.latlngs, { color, weight, dashArray })
+        .bindPopup(`<b>Enerji Hattı</b><br/>Voltaj: ${line.voltage ? line.voltage + 'V' : 'Bilinmiyor'}`)
+        .addTo(group);
+    });
+    group.addTo(map);
+    layerRef.current = group;
+
+    return () => { if (layerRef.current) map.removeLayer(layerRef.current); };
+  }, [lines, map]);
+
+  return null;
+}
+
 // Drawn polygon overlay (user-drawn blue dashed)
-const PolygonOverlay = ({ polygon }) => {
+const MultiPolygonOverlay = ({ polygons }) => {
   const map = useMap();
   const layerRef = useRef(null);
   useEffect(() => {
     if (layerRef.current) { map.removeLayer(layerRef.current); layerRef.current = null; }
-    if (!polygon || polygon.length === 0) return;
-    const polyLayer = L.polygon(polygon, {
-      color: '#3b82f6',
-      weight: 4,
-      fillColor: '#3b82f6',
-      fillOpacity: 0.2,
-      dashArray: '6, 6',
-    }).addTo(map);
-    layerRef.current = polyLayer;
-    return () => { map.removeLayer(polyLayer); };
-  }, [polygon, map]);
+    if (!polygons || polygons.length === 0) return;
+    const group = L.layerGroup();
+    polygons.forEach((poly, idx) => {
+      L.polygon(poly, {
+        color: idx === 0 ? '#3b82f6' : '#8b5cf6', // first blue, next purple
+        weight: 3,
+        fillColor: '#3b82f6',
+        fillOpacity: 0.2,
+      }).addTo(group);
+    });
+    group.addTo(map);
+    layerRef.current = group;
+    return () => { map.removeLayer(group); };
+  }, [polygons, map]);
   return null;
 };
 
-// TKGM parcel overlay (orange solid border, distinct from user drawings)
-const ParcelOverlay = ({ polygon }) => {
+
+
+// ── Substation Overlay (API + Manual) ─────────────────────────────────────────
+const SubstationOverlay = ({ isManualMode, onManualSelect, manualPoint, apiSubstation, centerPoint }) => {
   const map = useMap();
+  
+  useEffect(() => {
+    if (isManualMode) {
+      map._container.style.cursor = 'crosshair';
+    } else {
+      map._container.style.cursor = '';
+    }
+  }, [isManualMode, map]);
+
+  useMapEvents({
+    click(e) {
+      if (isManualMode) onManualSelect(e.latlng);
+    }
+  });
+
   const layerRef = useRef(null);
   useEffect(() => {
     if (layerRef.current) { map.removeLayer(layerRef.current); layerRef.current = null; }
-    if (!polygon || polygon.length === 0) return;
-    const poly = L.polygon(polygon, {
-      color: '#f59e0b',
-      weight: 3,
-      fillColor: '#f59e0b',
-      fillOpacity: 0.12,
-    });
-    poly.addTo(map);
-    // Auto-zoom to parcel
-    try { map.fitBounds(poly.getBounds(), { padding: [40, 40], animate: true }); } catch (_) { }
-    poly.bindPopup(`<b>&#x1F4D0; TKGM Parseli</b><br/>Kadastro siniri MEGSIS'ten alindi.`).openPopup();
-    layerRef.current = poly;
-    return () => { map.removeLayer(poly); };
-  }, [polygon, map]);
+
+    const group = L.layerGroup();
+    let hasContent = false;
+
+    // API-found substation marker (yellow/amber)
+    if (apiSubstation && apiSubstation.lat && apiSubstation.lng && !manualPoint) {
+      const apiIcon = L.divIcon({
+        className: 'bg-transparent',
+        html: `<div style="background:#f59e0b; width:18px; height:18px; border-radius:50%; border:3px solid white; box-shadow:0 0 8px rgba(245,158,11,0.7); display:flex; align-items:center; justify-content:center;">
+                 <span style="font-size:10px;">⚡</span>
+               </div>`,
+        iconSize: [18, 18],
+        iconAnchor: [9, 9]
+      });
+      L.marker([apiSubstation.lat, apiSubstation.lng], { icon: apiIcon })
+        .bindPopup(`<b>🔌 ${apiSubstation.name || 'Trafo Merkezi'}</b><br/>Mesafe: ${apiSubstation.km} km`)
+        .addTo(group);
+      
+      if (centerPoint) {
+        L.polyline([centerPoint, [apiSubstation.lat, apiSubstation.lng]], { 
+          color: '#f59e0b', weight: 2, dashArray: '6, 4', opacity: 0.8 
+        }).addTo(group);
+      }
+      hasContent = true;
+    }
+
+    // Manual substation marker (red)
+    if (manualPoint && centerPoint) {
+      const manualIcon = L.divIcon({
+        className: 'bg-transparent',
+        html: `<div style="background:#ef4444; width:16px; height:16px; border-radius:50%; border:2px solid white; box-shadow:0 0 5px rgba(0,0,0,0.5);"></div>`,
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+      });
+      L.marker(manualPoint, { icon: manualIcon })
+        .bindPopup('<b>📍 Manuel Trafo</b>')
+        .addTo(group);
+      L.polyline([centerPoint, manualPoint], { color: '#ef4444', weight: 3, dashArray: '5, 5' }).addTo(group);
+      hasContent = true;
+    }
+
+    if (hasContent) {
+      group.addTo(map);
+      layerRef.current = group;
+    }
+
+    return () => { if (layerRef.current) map.removeLayer(layerRef.current); }
+  }, [apiSubstation, manualPoint, centerPoint, map]);
+
   return null;
 };
 
@@ -371,15 +466,21 @@ export default function Analyzer({ onBack }) {
   const [analysisResult, setAnalysisResult] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisError, setAnalysisError] = useState(null);
+  const [gridLinesData, setGridLinesData] = useState(null);
   const [nearestSubstationKm, setNearestSubstationKm] = useState(null);
   const [isFetchingSubstation, setIsFetchingSubstation] = useState(false);
 
   // States for hidden map sync
   const [mapCenter, setMapCenter] = useState([39, 35]);
   const [mapBounds, setMapBounds] = useState(null);
-  const [drawnPolygon, setDrawnPolygon] = useState(null);
-  // TKGM parcel polygon (shown with distinct orange style)
-  const [parcelPolygon, setParcelPolygon] = useState(null);
+  
+  // Project Polygons (Multiple Parcels / Drawn polygons)
+  const [projectPolygons, setProjectPolygons] = useState([]);
+
+  // Manual substation state
+  const [isManualSubstationMode, setIsManualSubstationMode] = useState(false);
+  const [manualSubstationPoint, setManualSubstationPoint] = useState(null);
+  const [substationWarning, setSubstationWarning] = useState(null);
 
   // Drone Ortofoto states
   const [droneImageUrl, setDroneImageUrl] = useState(null);
@@ -389,6 +490,7 @@ export default function Analyzer({ onBack }) {
   const [droneAlignMode, setDroneAlignMode] = useState(false);
   const [droneZoomTrigger, setDroneZoomTrigger] = useState(0);
   const droneInputRef = useRef(null);
+  const gisInputRef = useRef(null);
   // Live map center tracked via ref (no state → no re-render → no flicker loop)
   const liveMapCenterRef = useRef([39, 35]);
 
@@ -552,11 +654,10 @@ export default function Analyzer({ onBack }) {
 
     // Fallback bounds: polygon or map center
     if (!bounds) {
-      const poly = drawnPolygon || parcelPolygon;
-      if (poly && poly.length > 0) {
-        const lats = poly.map(p => p.lat);
-        const lngs = poly.map(p => p.lng);
-        bounds = [[Math.min(...lats), Math.min(...lngs)], [Math.max(...lats), Math.max(...lngs)]];
+      if (projectPolygons && projectPolygons.length > 0) {
+        const allLats = projectPolygons.flatMap(poly => poly.map(p => p.lat));
+        const allLngs = projectPolygons.flatMap(poly => poly.map(p => p.lng));
+        bounds = [[Math.min(...allLats), Math.min(...allLngs)], [Math.max(...allLats), Math.max(...allLngs)]];
         console.log('[Ortofoto] ⚠️ Polygon sınırına yerleştiriliyor');
       } else {
         const [clat, clng] = liveMapCenterRef.current;
@@ -592,11 +693,12 @@ export default function Analyzer({ onBack }) {
   const handleLayerToggle = (id) =>
     setActiveLayer(prev => (prev === id ? 'standard' : id));
 
-  const handlePolygonDrawn = useCallback(async (latlngs) => {
-    setDrawnPolygon(latlngs);
-    if (!latlngs) {
+  const handleRunAnalysis = useCallback(async (polygons) => {
+    console.log('[handleRunAnalysis] called with', polygons?.length, 'polygons');
+    if (!polygons || polygons.length === 0) {
       setAnalysisResult(null);
       setNearestSubstationKm(null);
+      setGridLinesData(null);
       setMapBounds(null);
       return;
     }
@@ -605,10 +707,16 @@ export default function Analyzer({ onBack }) {
     setAnalysisError(null);
     setAnalysisResult(null);
     setNearestSubstationKm(null);
+    setGridLinesData(null);
     setIsFetchingSubstation(true);
+    setIsManualSubstationMode(false);
+    setManualSubstationPoint(null);
+    setSubstationWarning(null);
 
-    const centerLat = latlngs.reduce((s, p) => s + p.lat, 0) / latlngs.length;
-    const centerLng = latlngs.reduce((s, p) => s + p.lng, 0) / latlngs.length;
+    const allLats = polygons.flatMap(poly => poly.map(p => p.lat));
+    const allLngs = polygons.flatMap(poly => poly.map(p => p.lng));
+    const centerLat = (Math.min(...allLats) + Math.max(...allLats)) / 2;
+    const centerLng = (Math.min(...allLngs) + Math.max(...allLngs)) / 2;
     setMapCenter([centerLat, centerLng]);
 
     // Calculate 10km Buffer Bounds for "Uzaktan Görünüm"
@@ -621,9 +729,13 @@ export default function Analyzer({ onBack }) {
 
     try {
       // Run GES analysis and Overpass query in parallel
-      const [gesResult, substationResult] = await Promise.allSettled([
-        runGESAnalysis(latlngs),
-        fetchNearestSubstationKm(centerLat, centerLng, 15000),
+      const [gesResult, substationResult, gridLinesResult] = await Promise.allSettled([
+        runGESAnalysis(polygons),
+        fetchNearestSubstationKm(centerLat, centerLng, 15000, (msg) => {
+          setSubstationWarning(msg);
+          setTimeout(() => setSubstationWarning(null), 6000);
+        }),
+        fetchGridLines(centerLat, centerLng, 15000)
       ]);
 
       if (gesResult.status === 'fulfilled') {
@@ -636,6 +748,10 @@ export default function Analyzer({ onBack }) {
         setNearestSubstationKm(substationResult.value);
       } else {
         setNearestSubstationKm(null);
+      }
+
+      if (gridLinesResult.status === 'fulfilled') {
+        setGridLinesData(gridLinesResult.value);
       }
     } catch (err) {
       setAnalysisError("Sistemde beklenmedik bir hata oluştu.");
@@ -655,13 +771,69 @@ export default function Analyzer({ onBack }) {
 
     const latlngs = rawCoords.map(c => ({ lat: c[1], lng: c[0] }));
 
-    // Show the TKGM parcel in orange, clear any previously drawn polygon
-    setParcelPolygon(latlngs);
-    setDrawnPolygon(null);
+    setProjectPolygons(prev => {
+      const newPolys = [...prev, latlngs];
+      handleRunAnalysis(newPolys);
+      return newPolys;
+    });
+  }, [handleRunAnalysis]);
 
-    // Run the GES analysis on the parcel boundary
-    handlePolygonDrawn(latlngs);
-  }, [handlePolygonDrawn]);
+  const handleGISUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    console.log('[GIS Upload] Dosya:', file.name, file.size, 'bytes');
+    const text = await file.text();
+    let newPolys = [];
+    const lowerName = file.name.toLowerCase();
+    if (lowerName.endsWith('.kml')) {
+      console.log('[GIS Upload] KML parse başlıyor...');
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(text, "text/xml");
+      const coordsNodes = xmlDoc.getElementsByTagName("coordinates");
+      console.log('[GIS Upload] coordinates tag sayısı:', coordsNodes.length);
+      for (let i = 0; i < coordsNodes.length; i++) {
+        const coordsText = coordsNodes[i].textContent.trim();
+        const coordsArray = coordsText.split(/[\s\n\r]+/).filter(s => s.length > 0);
+        const poly = [];
+        for (const pair of coordsArray) {
+           const parts = pair.split(',').map(Number);
+           const lng = parts[0], lat = parts[1];
+           if (!isNaN(lat) && !isNaN(lng)) poly.push({ lat, lng });
+        }
+        console.log('[GIS Upload] KML polygon', i, '→', poly.length, 'nokta');
+        if (poly.length >= 3) newPolys.push(poly);
+      }
+    } else {
+      // geojson
+      console.log('[GIS Upload] GeoJSON parse başlıyor...');
+      try {
+        const json = JSON.parse(text);
+        const features = json.type === 'FeatureCollection' ? json.features : (json.type === 'Feature' ? [json] : [{ geometry: json }]);
+        for (const f of features) {
+          const geom = f.geometry;
+          if (!geom) continue;
+          if (geom.type === 'Polygon') {
+             newPolys.push(geom.coordinates[0].map(([lng, lat]) => ({ lat, lng })));
+          } else if (geom.type === 'MultiPolygon') {
+             for (const poly of geom.coordinates) {
+               newPolys.push(poly[0].map(([lng, lat]) => ({ lat, lng })));
+             }
+          }
+        }
+        console.log('[GIS Upload] GeoJSON →', newPolys.length, 'polygon bulundu');
+      } catch (err) { console.error('[GIS Upload] GeoJSON parse error:', err); }
+    }
+    
+    console.log('[GIS Upload] Toplam yeni polygon:', newPolys.length);
+    if (newPolys.length > 0) {
+      const updatedPolys = [...projectPolygons, ...newPolys];
+      setProjectPolygons(updatedPolys);
+      handleRunAnalysis(updatedPolys);
+    } else {
+      console.warn('[GIS Upload] Hiç polygon bulunamadı! Dosya formatını kontrol edin.');
+    }
+    if (gisInputRef.current) gisInputRef.current.value = '';
+  };
 
   return (
     <div className="flex flex-col md:flex-row w-full h-[100dvh] overflow-hidden bg-slate-950 text-slate-200 antialiased">
@@ -679,6 +851,30 @@ export default function Analyzer({ onBack }) {
           <ArrowLeft size={18} />
           <span>Geri Dön</span>
         </button>
+
+        {projectPolygons.length > 0 && (
+          <button
+            onClick={() => { setProjectPolygons([]); handleRunAnalysis([]); }}
+            className="absolute top-4 right-20 md:right-4 z-[1000] flex items-center gap-1.5 px-3 py-1.5 md:px-4 md:py-2 bg-red-600/90 backdrop-blur-md text-white rounded-lg shadow-lg hover:bg-red-500 transition-all font-bold text-xs"
+          >
+            <X size={14} /> Tüm Alanları Temizle
+          </button>
+        )}
+
+        {/* Floating Notifications */}
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[1000] flex flex-col gap-2 pointer-events-none">
+          {substationWarning && (
+            <div className="bg-yellow-500/90 text-black px-4 py-2 rounded-lg shadow-[0_0_15px_rgba(234,179,8,0.5)] font-bold text-sm animate-in fade-in slide-in-from-top-4 pointer-events-auto flex items-center gap-2">
+               <ShieldAlert size={16}/> {substationWarning}
+            </div>
+          )}
+          {isManualSubstationMode && (
+            <div className="bg-blue-600/90 text-white px-4 py-2 rounded-lg shadow-[0_0_15px_rgba(37,99,235,0.5)] font-bold text-sm animate-in fade-in slide-in-from-top-4 pointer-events-auto flex items-center gap-2">
+               Trafo konumunu harita üzerinde tıklayarak işaretleyin. 
+               <button onClick={() => setIsManualSubstationMode(false)} className="ml-2 bg-black/20 hover:bg-black/40 px-2 py-0.5 rounded text-xs transition-colors">İptal</button>
+            </div>
+          )}
+        </div>
 
         {/* Drone Upload & Opacity Controls */}
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] flex items-center gap-2">
@@ -713,19 +909,10 @@ export default function Analyzer({ onBack }) {
                 />
                 <span className="text-[10px] text-amber-400 font-mono w-8">{Math.round(droneOpacity * 100)}%</span>
               </div>
-              {!isFieldVerified && (
-                <button
-                  onClick={() => setIsFieldVerified(true)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold rounded-lg shadow-lg shadow-amber-500/30 transition-all hover:scale-105"
-                >
-                  <CheckCircle size={14} /> Saha Verisiyle Doğrula
-                </button>
-              )}
-              {isFieldVerified && (
-                <span className="flex items-center gap-1 px-2.5 py-1.5 bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 text-[10px] font-bold rounded-lg uppercase tracking-wider">
-                  <CheckCircle size={12} /> Doğrulandı
-                </span>
-              )}
+              <label className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900/80 backdrop-blur-md text-white text-[11px] uppercase tracking-wider font-bold rounded-lg border border-slate-700/50 cursor-pointer hover:bg-slate-800 transition-all">
+                <input type="checkbox" checked={isFieldVerified} onChange={(e) => setIsFieldVerified(e.target.checked)} className="accent-emerald-500 w-3.5 h-3.5"/>
+                Saha Görsel Teyidi
+              </label>
               {/* Remove ortofoto button */}
               <button
                 onClick={clearDrone}
@@ -736,6 +923,13 @@ export default function Analyzer({ onBack }) {
               </button>
             </>
           )}
+          <input type="file" accept=".kml,.geojson,.json,.KML,.GeoJSON" ref={gisInputRef} className="hidden" onChange={handleGISUpload} />
+          <button
+            onClick={() => gisInputRef.current?.click()}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600/90 backdrop-blur-md hover:bg-indigo-500 text-white text-xs font-bold rounded-lg shadow-lg transition-all"
+          >
+            <Upload size={14} /> GIS (.kml, .geojson)
+          </button>
         </div>
 
         <div className="flex-1 h-full relative" id="aura-map-container">
@@ -757,11 +951,31 @@ export default function Analyzer({ onBack }) {
             </LayersControl>
             <ChangeView center={mapCenter} bounds={mapBounds ? L.latLngBounds(mapBounds) : null} />
             <DynamicTile layer={activeLayer} />
-            <DrawControl onPolygonDrawn={(latlngs) => { handlePolygonDrawn(latlngs); }} />
+            <DrawControl onPolygonDrawn={(latlngs) => { 
+                if (latlngs) {
+                   setProjectPolygons(prev => {
+                     const upd = [...prev, latlngs];
+                     handleRunAnalysis(upd);
+                     return upd;
+                   });
+                }
+            }} />
             <AnalysisOverlay points={analysisResult?.points} />
-            <PolygonOverlay polygon={drawnPolygon} />
-            <ParcelOverlay polygon={parcelPolygon} />
+            <GridLinesOverlay lines={gridLinesData?.lines} />
+            <MultiPolygonOverlay polygons={projectPolygons} />
             <MapCenterRef centerRef={liveMapCenterRef} />
+            <SubstationOverlay 
+              isManualMode={isManualSubstationMode} 
+              onManualSelect={(latlng) => {
+                setIsManualSubstationMode(false);
+                setManualSubstationPoint(latlng);
+                const d = haversineKm(mapCenter[0], mapCenter[1], latlng.lat, latlng.lng);
+                setNearestSubstationKm({ km: +d.toFixed(2), lat: latlng.lat, lng: latlng.lng, name: 'Manuel Trafo' });
+              }} 
+              manualPoint={manualSubstationPoint}
+              apiSubstation={nearestSubstationKm}
+              centerPoint={mapCenter} 
+            />
             {droneImageUrl && droneBounds && (
               <>
                 <DroneImageOverlay imageUrl={droneImageUrl} initialBounds={droneBounds} opacity={droneOpacity} alignMode={droneAlignMode} />
@@ -804,7 +1018,7 @@ export default function Analyzer({ onBack }) {
                       <ChangeView center={mapCenter} bounds={boundsObj} />
                       <DynamicTile layer={l} />
                       <AnalysisOverlay points={analysisResult?.points} />
-                      <PolygonOverlay polygon={drawnPolygon} />
+                      <MultiPolygonOverlay polygons={projectPolygons} />
                     </MapContainer>
                   </div>
                 </div>
@@ -814,15 +1028,20 @@ export default function Analyzer({ onBack }) {
 
         </div>
 
-        <Dashboard
-          analysisResult={analysisResult}
-          isAnalyzing={isAnalyzing}
-          analysisError={analysisError}
-          nearestSubstationKm={nearestSubstationKm}
-          isFetchingSubstation={isFetchingSubstation}
-          isFieldVerified={isFieldVerified}
-          droneActive={!!droneImageUrl}
-        />
+          <Dashboard
+            analysisResult={analysisResult}
+            isAnalyzing={isAnalyzing}
+            analysisError={analysisError}
+            nearestSubstationKm={nearestSubstationKm}
+            isFetchingSubstation={isFetchingSubstation}
+            isFieldVerified={isFieldVerified}
+            droneActive={!!droneImageUrl}
+            gridLinesData={gridLinesData}
+            onManualSubstationClick={() => {
+              setIsManualSubstationMode(true);
+              setSubstationWarning(null);
+            }}
+          />
       </main>
     </div>
   );

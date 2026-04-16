@@ -1,4 +1,4 @@
-import { Activity, MapPin, TrendingUp, Sun, Zap, ShieldAlert, Eye, Cable, DollarSign, Download, Lock, X, Users, CheckCircle } from 'lucide-react';
+import { Activity, MapPin, TrendingUp, Sun, Zap, ShieldAlert, Eye, Cable, DollarSign, Download, Lock, X, Users, CheckCircle, Info, Target } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
 import React, { useState } from 'react';
 import { exportToPDF } from '../utils/pdfExport';
@@ -88,7 +88,7 @@ const ProLockOverlay = ({ children, title, icon: Icon, onUnlock }) => {
   );
 };
 
-export default function Dashboard({ analysisResult: r, isAnalyzing, analysisError, nearestSubstationKm, isFetchingSubstation, isFieldVerified = false, droneActive = false }) {
+export default function Dashboard({ analysisResult: r, isAnalyzing, analysisError, nearestSubstationKm, isFetchingSubstation, isFieldVerified = false, droneActive = false, onManualSubstationClick, gridLinesData }) {
   const [isExportingFree, setIsExportingFree] = useState(false);
   const [isExportingPro, setIsExportingPro] = useState(false);
   const [showPayment, setShowPayment] = useState(false);
@@ -161,18 +161,19 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
 
         {/* Results */}
         {!isAnalyzing && r && (() => {
+          const subKm = nearestSubstationKm?.km ?? null;
           const getSubstationPenalty = () => {
             if (isFetchingSubstation || nearestSubstationKm === undefined) return 1;
-            if (nearestSubstationKm === null) return 0.4;
-            if (nearestSubstationKm <= 5) return 1;
-            if (nearestSubstationKm <= 10) return 0.8;
+            if (subKm === null) return 0.4;
+            if (subKm <= 5) return 1;
+            if (subKm <= 10) return 0.8;
             return 0.5;
           };
 
           const substationPenalty = getSubstationPenalty();
           const penaltyMultiplier = substationPenalty * (r.landCover?.penalty ?? 1);
           const finalScore = Math.round(r.suitableRatioPct * penaltyMultiplier);
-          const hasSubstationWarning = !isFetchingSubstation && nearestSubstationKm !== undefined && (nearestSubstationKm === null || nearestSubstationKm > 10);
+          const hasSubstationWarning = !isFetchingSubstation && nearestSubstationKm !== undefined && (subKm === null || subKm > 10);
           const isProtectedArea = r.landCover?.penalty === 0;
 
           const baseCost = Math.round(r.suitableAreaHa * 600000);
@@ -187,7 +188,7 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
             slope: r.avgSlopeDeg,
             radiation: r.avgSolarKWhM2 > 0 ? r.avgSolarKWhM2.toLocaleString('tr-TR') : 'Yetersiz',
             capacity: r.capacityMW,
-            substation: nearestSubstationKm,
+            substation: subKm,
             landType: r.landCover?.label || 'Bilinmiyor',
             soil: r.soilConsistency || 'Bilinmiyor',
             mevzuat: r.mevzuatNotu?.text || null,
@@ -323,19 +324,53 @@ export default function Dashboard({ analysisResult: r, isAnalyzing, analysisErro
             {(isFetchingSubstation || nearestSubstationKm !== undefined) && (
               <ProLockOverlay title="Şebeke ve Trafo Mesafesi" icon={Cable} onUnlock={() => setShowPayment(true)}>
                 <div className={`border rounded-xl p-3 ${
-                  isFetchingSubstation ? 'border-slate-600/40' : nearestSubstationKm === null ? 'border-slate-600/40' : nearestSubstationKm <= 5 ? 'border-emerald-500/30' : nearestSubstationKm <= 10 ? 'border-yellow-500/30' : 'border-red-500/30'
+                  isFetchingSubstation ? 'border-slate-600/40' : subKm === null ? 'border-slate-600/40' : subKm <= 5 ? 'border-emerald-500/30' : subKm <= 10 ? 'border-yellow-500/30' : 'border-red-500/30'
                 }`}>
-                  <div className="flex items-baseline gap-2">
-                    {isFetchingSubstation ? (
-                      <span className="text-xl font-bold font-mono animate-pulse">Aranıyor...</span>
-                    ) : (
-                      <>
-                        <span className={`text-xl font-black font-mono ${nearestSubstationKm > 10 || nearestSubstationKm === null ? 'text-red-400' : 'text-blue-400'}`}>
-                          {nearestSubstationKm || '15+'} <span className="text-sm">km</span>
-                        </span>
-                        <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Kuş Uçuşu</span>
-                      </>
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-baseline gap-2 group relative">
+                      {isFetchingSubstation ? (
+                        <span className="text-xl font-bold font-mono animate-pulse">Aranıyor...</span>
+                      ) : (
+                        <>
+                          <span className={`text-xl font-black font-mono ${subKm > 10 || subKm === null ? 'text-red-400' : 'text-blue-400'}`}>
+                            {subKm || '15+'} <span className="text-sm">km</span>
+                          </span>
+                          <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">{nearestSubstationKm?.name || 'Kuş Uçuşu'}</span>
+                        </>
+                      )}
+
+                      {!isFetchingSubstation && (
+                        <>
+                          <Info size={14} className="text-slate-400 cursor-help" />
+                          <div className="absolute left-0 bottom-full mb-2 hidden group-hover:block w-64 p-2 bg-slate-800 text-slate-200 text-[10px] rounded shadow-xl border border-slate-700 z-50">
+                            Veriler açık kaynaklı harita servislerinden alınmaktadır. Sahadaki güncel trafo kapasiteleri ve yeni tesisler için resmi TEİAŞ verileriyle teyit edilmesi önerilir.
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    
+                    {!isFetchingSubstation && (subKm === null || subKm > 0) && (
+                       <button
+                         onClick={onManualSubstationClick}
+                         className="flex items-center gap-1.5 px-2 py-1 bg-slate-700 hover:bg-slate-600 text-slate-200 text-[10px] font-bold rounded shadow transition-all"
+                       >
+                         <Target size={12}/> Manuel Trafo İşaretle
+                       </button>
                     )}
+                  </div>
+                </div>
+              </ProLockOverlay>
+            )}
+
+            {/* Grid Line Distance */}
+            {gridLinesData?.nearestLineKm !== undefined && gridLinesData.nearestLineKm !== null && (
+              <ProLockOverlay title="En Yakın Enerji Hattı (Kablo)" icon={Cable} onUnlock={() => setShowPayment(true)}>
+                <div className={`border rounded-xl p-3 border-purple-500/30`}>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-xl font-black font-mono text-purple-400">
+                      {gridLinesData.nearestLineKm} <span className="text-sm">km</span>
+                    </span>
+                    <span className="text-xs text-slate-400 font-semibold uppercase tracking-wider">Kuş Uçuşu</span>
                   </div>
                 </div>
               </ProLockOverlay>

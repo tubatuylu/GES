@@ -133,8 +133,49 @@ export function haversineKm(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.asin(Math.sqrt(a));
 }
 
-export async function fetchNearestSubstationKm(centerLat, centerLng, radiusM = 15000) {
-  const query = `[out:json][timeout:25];(node["power"="substation"](around:${radiusM},${centerLat},${centerLng});way["power"="substation"](around:${radiusM},${centerLat},${centerLng});relation["power"="substation"](around:${radiusM},${centerLat},${centerLng}););out center;`;
+export async function fetchNearestSubstationKm(centerLat, centerLng, radiusM = 15000, onWarn = null) {
+  const radii = [...new Set([radiusM, 20000])].sort((a, b) => a - b);
+
+  for (const rM of radii) {
+    const query = `[out:json][timeout:25];(nwr["power"~"^(substation|transformer|station)$"](around:${rM},${centerLat},${centerLng});nwr["substation"](around:${rM},${centerLat},${centerLng}););out center;`;
+    const res = await fetch('https://overpass-api.de/api/interpreter', {
+      method: 'POST',
+      body: 'data=' + encodeURIComponent(query)
+    });
+    if (!res.ok) throw new Error('Overpass API Hatası');
+    const data = await res.json();
+    const elements = data.elements ?? [];
+
+    if (elements.length > 0) {
+      let minKm = Infinity;
+      let nearest = null;
+      for (const el of elements) {
+        const lat = el.lat ?? el.center?.lat;
+        const lng = el.lon ?? el.center?.lon;
+        if (lat == null || lng == null) continue;
+        const d = haversineKm(centerLat, centerLng, lat, lng);
+        if (d < minKm) {
+          minKm = d;
+          nearest = { 
+            km: +d.toFixed(2), 
+            lat, 
+            lng, 
+            name: el.tags?.name || el.tags?.['name:tr'] || 'Trafo Merkezi'
+          };
+        }
+      }
+      if (nearest) return nearest;
+    }
+
+    if (onWarn && rM < 20000) {
+      onWarn(`${rM / 1000} km içinde trafo bulunamadı. Arama alanı genişletiliyor...`);
+    }
+  }
+  return null;
+}
+
+export async function fetchGridLines(centerLat, centerLng, radiusM = 15000) {
+  const query = `[out:json][timeout:25];(way["power"~"^(line|cable)$"](around:${radiusM},${centerLat},${centerLng}););out geom;`;
   const res = await fetch('https://overpass-api.de/api/interpreter', {
     method: 'POST',
     body: 'data=' + encodeURIComponent(query)
@@ -142,17 +183,31 @@ export async function fetchNearestSubstationKm(centerLat, centerLng, radiusM = 1
   if (!res.ok) throw new Error('Overpass API Hatası');
   const data = await res.json();
   const elements = data.elements ?? [];
-  if (elements.length === 0) return null;
 
-  let minKm = Infinity;
+  let nearestKm = Infinity;
+  let lines = [];
+  
   for (const el of elements) {
-    const lat = el.lat ?? el.center?.lat;
-    const lng = el.lon ?? el.center?.lon;
-    if (lat == null || lng == null) continue;
-    const d = haversineKm(centerLat, centerLng, lat, lng);
-    if (d < minKm) minKm = d;
+    if (!el.geometry || el.geometry.length === 0) continue;
+    
+    const latlngs = el.geometry.map(g => [g.lat, g.lon]);
+    
+    for (const g of el.geometry) {
+       const d = haversineKm(centerLat, centerLng, g.lat, g.lon);
+       if (d < nearestKm) nearestKm = d;
+    }
+    
+    lines.push({
+      id: el.id,
+      voltage: el.tags?.voltage,
+      latlngs
+    });
   }
-  return minKm === Infinity ? null : +minKm.toFixed(2);
+  
+  return {
+    nearestLineKm: nearestKm === Infinity ? null : +nearestKm.toFixed(2),
+    lines
+  };
 }
 
 export async function fetchEsriLandCover(lat, lng) {
@@ -228,22 +283,70 @@ function inferSoilConsistency(slope, lcVal) {
 // ── Ana Analiz Motoru ─────────────────────────────────────────────────────────
 
 /**
- * @param {Array} latlngs - Polygon vertices
+ * @param {Array|Array<Array>} polygonsRaw - Polygon vertices or array of polygons
  * @param {Object} [options] - Optional configuration
  * @param {boolean} [options.isFieldVerified=false] - Whether drone/field verification is active
  */
-export async function runGESAnalysis(latlngs, options = {}) {
+export async function runGESAnalysis(polygonsRaw, options = {}) {
   const { isFieldVerified = false } = options;
 
-  const area = geodesicAreaM2(latlngs);
-  const perimeter = perimeterM(latlngs);
-  const avgLat = latlngs.reduce((s, p) => s + p.lat, 0) / latlngs.length;
-  const avgLng = latlngs.reduce((s, p) => s + p.lng, 0) / latlngs.length;
+  let polygons = [];
+  if (polygonsRaw && polygonsRaw.length > 0) {
+    // Determine if it's a multi-polygon
+    if (Array.isArray(polygonsRaw[0])) {
+      polygons = polygonsRaw;
+    } else {
+      polygons = [polygonsRaw];
+    }
+  } else {
+    throw new Error("Geçerli bir alan bulunamadı.");
+  }
 
-  if (area > 200000000) throw new Error('Seçilen alan çok büyük (Maks 200km²).');
+  const allLats = polygons.flatMap(poly => poly.map(p => p.lat));
+  const allLngs = polygons.flatMap(poly => poly.map(p => p.lng));
+  const minLat = Math.min(...allLats), maxLat = Math.max(...allLats);
+  const minLng = Math.min(...allLngs), maxLng = Math.max(...allLngs);
+  const avgLat = (minLat + maxLat) / 2;
+  const avgLng = (minLng + maxLng) / 2;
 
-  const N = area < 50000 ? 7 : area < 200000 ? 8 : area < 1000000 ? 9 : area < 5000000 ? 10 : area < 20000000 ? 11 : area < 50000000 ? 12 : 15;
-  const { grid, allCoords, latStep, lngStep } = buildGrid(latlngs, N);
+  let totalArea = 0;
+  let totalPerimeter = 0;
+  for (const poly of polygons) {
+    totalArea += geodesicAreaM2(poly);
+    totalPerimeter += perimeterM(poly);
+  }
+
+  if (totalArea > 200000000) throw new Error('Seçilen alan çok büyük (Maks 200km²).');
+
+  // ── Per-polygon grid building ──────────────────────────────────────────────
+  // Build a separate grid for each polygon to avoid sparse sampling across distant parcels
+  const perPolyGrids = [];
+  const allCoords = [];
+  
+  for (const poly of polygons) {
+    const pLats = poly.map(p => p.lat);
+    const pLngs = poly.map(p => p.lng);
+    const pMinLat = Math.min(...pLats), pMaxLat = Math.max(...pLats);
+    const pMinLng = Math.min(...pLngs), pMaxLng = Math.max(...pLngs);
+    const pArea = geodesicAreaM2(poly);
+    const N = pArea < 50000 ? 7 : pArea < 200000 ? 8 : pArea < 1000000 ? 9 : pArea < 5000000 ? 10 : pArea < 20000000 ? 11 : pArea < 50000000 ? 12 : 15;
+    const latStep = (pMaxLat - pMinLat) / Math.max(N - 1, 1);
+    const lngStep = (pMaxLng - pMinLng) / Math.max(N - 1, 1);
+
+    const grid = [];
+    const startIdx = allCoords.length;
+    for (let i = 0; i < N; i++) {
+      grid[i] = [];
+      for (let j = 0; j < N; j++) {
+        const lat = pMinLat + i * latStep;
+        const lng = pMinLng + j * lngStep;
+        const inside = pointInPolygon(lat, lng, poly);
+        grid[i][j] = { lat, lng, inside };
+        allCoords.push({ lat, lng });
+      }
+    }
+    perPolyGrids.push({ grid, N, latStep, lngStep, startIdx });
+  }
 
   const [elevations, nasaData, landCoverVal] = await Promise.all([
     fetchElevations(allCoords),
@@ -254,56 +357,65 @@ export async function runGESAnalysis(latlngs, options = {}) {
   const NASA_SOLAR = nasaData.annualTotal;
   const monthlySolar = nasaData.monthlySolar;
 
-  const E = Array.from({ length: N }, (_, i) =>
-    Array.from({ length: N }, (_, j) => elevations[i * N + j] ?? 0)
-  );
-
   const mPerLat = 111320;
-  const mPerLng = 111320 * Math.cos(avgLat * DEG);
-  const dy = latStep * mPerLat;
-  const dx = lngStep * mPerLng;
-
   const points = [];
 
-  for (let i = 1; i < N - 1; i++) {
-    for (let j = 1; j < N - 1; j++) {
-      if (!grid[i][j].inside) continue;
+  for (const { grid, N, latStep, lngStep, startIdx } of perPolyGrids) {
+    const pAvgLat = grid[Math.floor(N/2)]?.[Math.floor(N/2)]?.lat ?? avgLat;
+    const mPerLng = 111320 * Math.cos(pAvgLat * DEG);
+    const dy = latStep * mPerLat;
+    const dx = lngStep * mPerLng;
 
-      const eN = E[i + 1][j], eS = E[i - 1][j], eE = E[i][j + 1], eW = E[i][j - 1];
-      const dzdy = (eN - eS) / (2 * dy);
-      const dzdx = (eE - eW) / (2 * dx);
+    // Build elevation matrix for this polygon's grid
+    const E = Array.from({ length: N }, (_, i) =>
+      Array.from({ length: N }, (_, j) => elevations[startIdx + i * N + j] ?? 0)
+    );
 
-      const slopeDeg = Math.atan(Math.sqrt(dzdx ** 2 + dzdy ** 2)) / DEG;
-      let aspectDeg = (90 - Math.atan2(-dzdy, -dzdx) / DEG + 360) % 360;
+    for (let i = 1; i < N - 1; i++) {
+      for (let j = 1; j < N - 1; j++) {
+        if (!grid[i][j].inside) continue;
 
-      const hsWinter = hillshade(slopeDeg, aspectDeg, 25.5, 180);
-      const hsAnnual = hillshade(slopeDeg, aspectDeg, 47, 180);
+        const eN = E[i + 1][j], eS = E[i - 1][j], eE = E[i][j + 1], eW = E[i][j - 1];
+        const dzdy = (eN - eS) / (2 * dy);
+        const dzdx = (eE - eW) / (2 * dx);
 
-      const isNorth = aspectDeg < 45 || aspectDeg > 315;
-      const isSteep = slopeDeg > 15;
-      const mask = isNorth ? 'north' : isSteep ? 'steep' : (hsWinter < 55 ? 'shadow' : null);
+        const slopeDeg = Math.atan(Math.sqrt(dzdx ** 2 + dzdy ** 2)) / DEG;
+        let aspectDeg = (90 - Math.atan2(-dzdy, -dzdx) / DEG + 360) % 360;
 
-      const optimalTilt = 90 - 47;
-      const incidencePenalty = Math.cos((Math.abs(slopeDeg - optimalTilt)) * DEG);
-      const corrRadiation = mask ? 0 : Math.max(0, NASA_SOLAR * incidencePenalty * (hsAnnual / 255));
+        const hsWinter = hillshade(slopeDeg, aspectDeg, 25.5, 180);
+        const hsAnnual = hillshade(slopeDeg, aspectDeg, 47, 180);
 
-      points.push({
-        lat: grid[i][j].lat,
-        lng: grid[i][j].lng,
-        elevation: E[i][j],
-        slopeDeg: +slopeDeg.toFixed(1),
-        aspectDeg: +aspectDeg.toFixed(0),
-        hsWinter: +hsWinter.toFixed(0),
-        mask,
-        suitable: !mask,
-        corrRadiation: +corrRadiation.toFixed(0),
-      });
+        const isNorth = aspectDeg < 45 || aspectDeg > 315;
+        const isSteep = slopeDeg > 15;
+        const mask = isNorth ? 'north' : isSteep ? 'steep' : (hsWinter < 55 ? 'shadow' : null);
+
+        const optimalTilt = 90 - 47;
+        const incidencePenalty = Math.cos((Math.abs(slopeDeg - optimalTilt)) * DEG);
+        const corrRadiation = mask ? 0 : Math.max(0, NASA_SOLAR * incidencePenalty * (hsAnnual / 255));
+
+        points.push({
+          lat: grid[i][j].lat,
+          lng: grid[i][j].lng,
+          elevation: E[i][j],
+          slopeDeg: +slopeDeg.toFixed(1),
+          aspectDeg: +aspectDeg.toFixed(0),
+          hsWinter: +hsWinter.toFixed(0),
+          mask,
+          suitable: !mask,
+          corrRadiation: +corrRadiation.toFixed(0),
+        });
+      }
     }
+  }
+
+  // Safeguard against empty points (e.g. very tiny parcels where no grid interior points exist)
+  if (points.length === 0) {
+    throw new Error('Seçilen alanlar çok küçük veya grid noktası oluşturulamadı. Lütfen daha büyük bir alan seçin.');
   }
 
   const suitable = points.filter(p => p.suitable);
   const suitableRatio = suitable.length / points.length;
-  const suitableAreaM2 = area * suitableRatio;
+  const suitableAreaM2 = totalArea * suitableRatio;
 
   const avgSlope = +(points.reduce((s, p) => s + p.slopeDeg, 0) / points.length).toFixed(1);
   const landCover = getLandCoverStatus(landCoverVal);
@@ -323,9 +435,9 @@ export async function runGESAnalysis(latlngs, options = {}) {
     : null;
 
   return {
-    totalAreaM2: Math.round(area),
-    totalAreaHa: (area / 10000).toFixed(2),
-    perimeterM: Math.round(perimeter),
+    totalAreaM2: Math.round(totalArea),
+    totalAreaHa: (totalArea / 10000).toFixed(2),
+    perimeterM: Math.round(totalPerimeter),
     avgElevationM: Math.round(points.reduce((s, p) => s + p.elevation, 0) / points.length),
     suitableAreaM2: Math.round(suitableAreaM2),
     suitableAreaHa: (suitableAreaM2 / 10000).toFixed(2),
